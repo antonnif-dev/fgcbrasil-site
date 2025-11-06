@@ -19,6 +19,27 @@ import {
   limit
 } from 'firebase/firestore';
 
+// MAPA DE JOGOS
+const GAME_MAP = {
+  'sf6': {
+    name: 'Street Fighter 6',
+    icon: '/assets/icones-jogos/sf6.jpeg' 
+  },
+  'mk1': {
+    name: 'Mortal Kombat 1',
+    icon: '/assets/icones-jogos/mk1.jpeg'
+  },
+  'tekken8': {
+    name: 'Tekken 8',
+    icon: '/assets/icones-jogos/tekken8.jpeg'
+  },
+  'ggst': {
+    name: 'Guilty Gear -Strive-',
+    icon: '/assets/icones-jogos/ggst.jpeg'
+  },
+  
+};
+
 // --- ARQUIVO: firebase.js (EMBUTIDO) ---
 const firebaseConfig = {
   apiKey: "AIzaSyCU8gB21qsHCJ4oHniFJkN4KrIVyiz-t8w",
@@ -41,59 +62,63 @@ const useAuth = () => {
 };
 
 // --- PROVEDOR DE AUTENTICAÇÃO ---
-const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [userData, setUserData] = useState(null);
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null); 
+  const [userData, setUserData] = useState(null); 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      // (Logs de debug removidos)
       setUser(user);
       if (user) {
         const userDocRef = doc(db, 'users', user.uid);
-        const unsubscribeDoc = onSnapshot(userDocRef,
+        
+        const unsubscribeDoc = onSnapshot(userDocRef, 
           (doc) => {
+            // (Logs de debug removidos)
             if (doc.exists()) {
               setUserData(doc.data());
             } else {
-              setUserData(null);
+              setUserData(null); 
             }
             setLoading(false);
-          },
+          }, 
           (error) => {
-            console.error("onSnapshot Erro:", error);
+            console.error("onSnapshot Erro:", error); // MANTEMOS este log de ERRO
             setUserData(null);
-            setLoading(false);
+            setLoading(false); 
           }
         );
         return () => unsubscribeDoc();
       } else {
+        // (Logs de debug removidos)
         setUserData(null);
         setLoading(false);
       }
     });
-    return () => unsubscribe();
-  }, []);
+
+    return () => {
+      unsubscribe(); 
+    };
+  }, []); // Dependência vazia
 
   const value = { user, userData, loading };
+  
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
 
 // --- COMPONENTE PRINCIPAL (O ROTEADOR) ---
 function AppContent() {
   const [page, setPage] = useState('home'); 
   const { user, userData, loading } = useAuth(); 
 
-  // Verifica se estamos na Rifa para esconder os banners laterais
-  const isRifaPage = page === 'rifa';
-
   if (loading) {
     return <LoadingSpinner text="Carregando Autenticação..." />
   }
   
   const renderPage = () => {
-    // ... (toda a sua lógica 'switch (page)' continua aqui, sem mudança) ...
     if (user && userData) {
       // Logado e com dados
       switch (page) {
@@ -114,6 +139,15 @@ function AppContent() {
         case 'rifa': 
           return <RifaPage setPage={setPage} />;
           
+        // --- ROTA DE PERFIL ADICIONADA ---
+        case 'profile':
+          // Jogadores e Fãs podem editar o perfil
+          if (userData.tipo === 'jogador' || userData.tipo === 'fã') {
+            return <ProfilePage setPage={setPage} />;
+          }
+          // Admins e Orgs são redirecionados
+          return <DashboardPage setPage={setPage} />;
+        
         case 'admin':
           if (userData.admin === true && userData.tipo === 'admin') { 
             return <AdminPage setPage={setPage} />;
@@ -124,20 +158,18 @@ function AppContent() {
           return <DashboardPage setPage={setPage} />; 
       }
     } else if (user && !userData) {
-      // Logado mas sem dados (ex: registro)
        return <LoadingSpinner text="Finalizando registro..." />
     } else {
-      // Não logado (user=null)
       return <LoginPage setPage={setPage} />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-brand-dark text-brand-light font-sans relative">      
+    <div className="min-h-screen bg-brand-dark text-brand-light font-sans relative">
       <LeftSponsorBanner />
-      <RightSponsorBanner />      
+      <RightSponsorBanner />
       <Navbar setPage={setPage} />
-      <main className="container mx-auto p-4 md:p-8 px-12 lg:px-48">
+      <main className="container mx-auto p-4 md:p-8 px-28 lg:px-48">
         {renderPage()}
       </main>
     </div>
@@ -158,84 +190,148 @@ export default function App() {
 // --- Navbar ---
 function Navbar({ setPage }) {
   const { user, userData } = useAuth();
+  
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const handleLogout = async () => {
     await signOut(auth);
+    setIsMobileMenuOpen(false); // Fecha o menu ao sair
     setPage('login');
   };
+  
+  const handleNavClick = (page) => {
+    setPage(page);
+    setIsMobileMenuOpen(false);
+  };
 
-  // Esta função decide quais links mostrar
-  const renderNavLinks = () => {
-    // Se não estiver logado
+  const renderNavLinks = (isMobile = false) => {
+    const LinkComponent = isMobile ? MobileNavLink : NavLink;
+    const clickHandler = (page) => isMobile ? () => handleNavClick(page) : () => setPage(page);
+
     if (!user || !userData) {
-      return <Button primary onClick={() => setPage('login')}>Login / Registro</Button>;
+      return (
+        <Button primary onClick={() => clickHandler('login')}>
+          Login / Registro
+        </Button>
+      );
     }
+    
+    const hasProfilePage = userData.tipo === 'jogador' || userData.tipo === 'fã';
+    const profileImage = userData.profileImageUrl || 'https://placehold.co/40x40/6f42c1/ffffff?text=U';
 
-    // Se for Admin Global (tipo 'admin' E admin:true)
     if (userData.admin === true && userData.tipo === 'admin') {
       return (
         <>
-          <NavLink onClick={() => setPage('dashboard')}>Dashboard</NavLink>
-          <NavLink onClick={() => setPage('championships')}>Organizações</NavLink>
-          <NavLink onClick={() => setPage('ranking')}>Ranking</NavLink>
-          <NavLink onClick={() => setPage('rifa')}>Rifa</NavLink>
-          <NavLink onClick={() => setPage('admin')}>
-            <span className="text-teal-300 font-bold">Admin</span>
-          </NavLink>
+          <LinkComponent onClick={clickHandler('dashboard')}>Dashboard</LinkComponent>
+          <LinkComponent onClick={clickHandler('championships')}>Organizações</LinkComponent>
+          <LinkComponent onClick={clickHandler('ranking')}>Ranking</LinkComponent>
+          <LinkComponent onClick={clickHandler('rifa')}>Rifa</LinkComponent>
+          <LinkComponent onClick={clickHandler('admin')}>
+            <span className={!isMobile ? "text-teal-300 font-bold" : ""}>Admin</span>
+          </LinkComponent>
           <Button onClick={handleLogout}>Sair</Button>
         </>
       );
     }
     
-    // Se for Jogador OU Organizador (eles veem o mesmo)
     if (userData.tipo === 'jogador' || userData.tipo === 'organizador') {
        return (
         <>
-          <NavLink onClick={() => setPage('dashboard')}>Dashboard</NavLink>
-          <NavLink onClick={() => setPage('championships')}>Organizações</NavLink>
-          <NavLink onClick={() => setPage('ranking')}>Ranking</NavLink>
-          <NavLink onClick={() => setPage('rifa')}>Rifa</NavLink>
+          <LinkComponent onClick={clickHandler('dashboard')}>Dashboard</LinkComponent>
+          <LinkComponent onClick={clickHandler('championships')}>Organizações</LinkComponent>
+          <LinkComponent onClick={clickHandler('ranking')}>Ranking</LinkComponent>
+          <LinkComponent onClick={clickHandler('rifa')}>Rifa</LinkComponent>
+          {hasProfilePage && (
+             <img 
+               src={profileImage} 
+               alt="Perfil" 
+               className="w-10 h-10 rounded-full cursor-pointer object-cover" 
+               onClick={clickHandler('profile')}
+             />
+          )}
+          {/* --- BOTÃO "SAIR" ADICIONADO DE VOLTA --- */}
           <Button onClick={handleLogout}>Sair</Button>
         </>
       );
     }
     
-    // Se for Fã
     if (userData.tipo === 'fã') {
        return (
         <>
-          <NavLink onClick={() => setPage('dashboard')}>Dashboard</NavLink>
-          <NavLink onClick={() => setPage('championships')}>Organizações</NavLink>
-          <NavLink onClick={() => setPage('streamers')}>Streamers</NavLink>
-          <NavLink onClick={() => setPage('missões')}>Missões</NavLink>
-          <NavLink onClick={() => setPage('ranking')}>Ranking</NavLink>
-          <NavLink onClick={() => setPage('rifa')}>Rifa</NavLink>
+          <LinkComponent onClick={clickHandler('dashboard')}>Dashboard</LinkComponent>
+          <LinkComponent onClick={clickHandler('championships')}>Organizações</LinkComponent>
+          <LinkComponent onClick={clickHandler('streamers')}>Streamers</LinkComponent>
+          <LinkComponent onClick={clickHandler('missões')}>Missões</LinkComponent>
+          <LinkComponent onClick={clickHandler('ranking')}>Ranking</LinkComponent>
+          <LinkComponent onClick={clickHandler('rifa')}>Rifa</LinkComponent>
+          <img 
+            src={profileImage} 
+            alt="Perfil" 
+            className="w-10 h-10 rounded-full cursor-pointer object-cover" 
+            onClick={clickHandler('profile')}
+          />
+          {/* --- BOTÃO "SAIR" ADICIONADO DE VOLTA --- */}
           <Button onClick={handleLogout}>Sair</Button>
         </>
       );
     }
-
-    // Fallback
+    
     return <Button onClick={handleLogout}>Sair</Button>;
   };
 
   return (
-    <nav className="bg-gray-800 shadow-lg sticky top-0 z-50">
+    <nav className="bg-gray-800 shadow-lg sticky top-0 z-50 relative">
       <div className="container mx-auto px-4 md:px-8">
         <div className="flex justify-between items-center h-20">
-          <div className="text-2xl font-bold text-white cursor-pointer" onClick={() => setPage(user ? 'dashboard' : 'home')}>
+          
+          <div 
+            className="text-2xl font-bold text-white cursor-pointer"
+            onClick={() => handleNavClick(user ? 'dashboard' : 'home')}
+          >
             <span className="text-purple-400">FGC</span>Brasil
           </div>
-          <div className="flex items-center space-x-4">
-            {renderNavLinks()}
+
+          <div className="hidden lg:flex items-center space-x-4">
+            {renderNavLinks(false)}
           </div>
+          
+          <div className="lg:hidden">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="text-gray-300 hover:text-white p-2 rounded-md"
+            >
+              {isMobileMenuOpen ? (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+              )}
+            </button>
+          </div>
+          
         </div>
       </div>
+      
+      <div className={`${isMobileMenuOpen ? 'block' : 'hidden'} lg:hidden absolute top-full left-0 w-full bg-gray-800 shadow-lg z-50`}>
+        <div className="p-4 space-y-2">
+          {renderNavLinks(true)}
+        </div>
+      </div>
+      
     </nav>
   );
 }
 
 const NavLink = ({ children, onClick }) => (
   <button onClick={onClick} className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition">
+    {children}
+  </button>
+);
+
+const MobileNavLink = ({ children, onClick }) => (
+  <button
+    onClick={onClick}
+    className="block w-full text-left px-4 py-3 text-lg text-gray-300 hover:bg-gray-700 hover:text-white"
+  >
     {children}
   </button>
 );
@@ -429,7 +525,7 @@ function CostsCard({ onOpenModal }) {
 function LeftSponsorBanner() {
   // Nota: 'hidden lg:block' esconde o banner em telas pequenas/médias
   return (
-    <div className="fixed left-4 top-1/2 -translate-y-1/2 z-40">
+    <div className="fixed left-4 top-60 z-40">
       <a href="#" target="_blank" rel="noopener noreferrer">
         <img 
           src="/assets/patrocinador1.jpg" // Caminho do Asset
@@ -458,7 +554,7 @@ function LeftSponsorBanner() {
 // Banner da Direita (Fixo)
 function RightSponsorBanner() {
   return (
-    <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40">
+    <div className="fixed right-4 top-60 z-40">
       <a href="#" target="_blank" rel="noopener noreferrer">
         <img 
           src="/assets/patrocinador3.jpg" // Caminho do Asset
@@ -735,8 +831,6 @@ function StreamersPage() {
     </div>
   );
 }
-
-// --- (ADICIONE ESTES DOIS NOVOS COMPONENTES DE PÁGINA) ---
 
 // Este é o formulário que SÓ o Admin verá
 function AdminRifaForm({ onParticipanteAdded, allUsers }) { // Recebe allUsers
@@ -1139,10 +1233,32 @@ function DashboardPage({ setPage }) {
   
   const [showCostsModal, setShowCostsModal] = useState(false);
   
+  // --- NOVO ESTADO: Para o total de contribuições ---
+  const [totalContributions, setTotalContributions] = useState(0);
+  const [loadingTotal, setLoadingTotal] = useState(true);
+
+  // --- NOVO EFEITO: Busca o total de contribuições ---
+  useEffect(() => {
+    const fetchTotalContributions = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/api/contributions/total');
+        const data = await res.json();
+        if (res.ok) {
+          setTotalContributions(data.total);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar total de contribuições:", err);
+      }
+      setLoadingTotal(false);
+    };
+    fetchTotalContributions();
+  }, []); // Roda uma vez no carregamento
+
   if (!userData) return <LoadingSpinner />;
 
   // Função para renderizar o dashboard específico do usuário
   const renderUserDashboard = () => {
+    // ... (o switch case continua o mesmo) ...
     switch (userData.tipo) {
       case 'jogador':
         return <PlayerDashboard />;
@@ -1150,7 +1266,7 @@ function DashboardPage({ setPage }) {
         return <FanDashboard />;
       case 'organizador':
         return (
-          <div className="bg-gray-800 p-6 rounded-xl shadow-lg">
+          <div className="bg-gray-800 p-6 rounded-xl shadow-lg text-center">
             <h3 className="text-2xl font-semibold mb-4">Dashboard de Organizador</h3>
             <p className="text-gray-400 mb-6">
               Bem-vindo! Você pode ver os rankings e as organizações.
@@ -1159,7 +1275,7 @@ function DashboardPage({ setPage }) {
         );
       case 'admin':
          return (
-          <div className="bg-gray-800 p-6 rounded-xl shadow-lg">
+          <div className="bg-gray-800 p-6 rounded-xl shadow-lg flex flex-col items-center text-center">
             <h3 className="text-2xl font-semibold mb-4">Dashboard de Admin Global</h3>
             <p className="text-gray-400 mb-6">Vá para a página de "Admin" para gerenciar toda a plataforma.</p>
             <Button primary onClick={() => setPage('admin')}>Ir para o Painel Admin</Button>
@@ -1175,14 +1291,35 @@ function DashboardPage({ setPage }) {
       <h1 className="text-4xl font-bold mb-2">Bem-vindo, {userData.nome}!</h1>
       <p className="text-xl text-gray-400 mb-8">Seu dashboard de {userData.tipo}.</p>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      {/* --- SEÇÃO STATS MODIFICADA (grid-cols-4) --- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard title="Seu XP Total" value={userData.xpTotal.toFixed(2)} />
         <StatCard title="Ranking (Global)" value="#N/A" subtitle="Em breve" />
+        
+        {/* Card de Contribuições Pessoais (depende do tipo de usuário) */}
+        {userData.tipo === 'fã' ? (
+          <StatCard 
+            title="Minhas Doações" 
+            value={userData.contribuicoes ? userData.contribuicoes.length : 0} 
+            className="text-center"
+          />
+        ) : (
+          <StatCard 
+            title="Camps. Participados" 
+            value={userData.campeonatosParticipados.length} 
+            className="text-center"
+          />
+        )}
+        
+        {/* --- NOVO CARD: Total de Contribuições --- */}
         <StatCard 
-          title={userData.tipo === 'jogador' ? 'Campeonatos' : 'Contribuições'} 
-          value={userData.tipo === 'jogador' ? userData.campeonatosParticipados.length : (userData.contribuicoes ? userData.contribuicoes.length : 0)} 
+          title="Total Arrecadado (Fãs)" 
+          value={loadingTotal ? "..." : `R$ ${totalContributions.toFixed(2)}`}
+          subtitle="Apoio de toda a comunidade"
+          className="text-center"
         />
       </div>
+      {/* --- FIM DA SEÇÃO STATS --- */}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -1191,16 +1328,139 @@ function DashboardPage({ setPage }) {
           {renderUserDashboard()}
         </div>
         
-        {/* Coluna Direita (menor) - MODIFICADA */}
-        <div className="lg:col-span-1 space-y-6"> {/* Adiciona espaçamento entre os cards */}
+        {/* Coluna Direita (menor) */}
+        <div className="lg:col-span-1 space-y-6"> 
           <CostsCard onOpenModal={() => setShowCostsModal(true)} />
-          <ContactAdminCard /> {/* <-- CARD ADICIONADO AQUI */}
+          <ContactAdminCard /> 
         </div>
         
       </div>
 
       {/* O Modal (renderização condicional) */}
       {showCostsModal && <CostsModal onClose={() => setShowCostsModal(false)} />}
+    </div>
+  );
+}
+
+// --- PÁGINA PROFILE ---
+function ProfilePage() {
+  const { user, userData } = useAuth();
+  
+  // --- !! PREENCHA COM SEUS DADOS DO CLOUDINARY !! ---
+  const CLOUDINARY_CLOUD_NAME = "dy0hmkgry"; 
+  const CLOUDINARY_UPLOAD_PRESET = "br5z3gyj";
+  // ---
+  
+  const [teamName, setTeamName] = useState(userData.teamName || '');
+  const [file, setFile] = useState(null); // O arquivo selecionado
+  const [preview, setPreview] = useState(userData.profileImageUrl); // A prévia da imagem
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  
+  // Cria a prévia da imagem quando um arquivo é selecionado
+  useEffect(() => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }, [file]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+
+    try {
+      let imageUrl = userData.profileImageUrl; // Começa com a imagem antiga
+
+      // 1. Se um NOVO arquivo foi selecionado, faça o upload para o Cloudinary
+      if (file) {
+        if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+          throw new Error("Cloudinary não está configurado no frontend.");
+        }
+      
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+        
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error.message || 'Falha no upload do Cloudinary');
+        
+        imageUrl = data.secure_url; // Pega a nova URL
+      }
+
+      // 2. Envie a URL (nova ou antiga) para o SEU backend
+      const token = await user.getIdToken();
+      const resBackend = await fetch('http://localhost:3001/api/users/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          profileImageUrl: imageUrl,
+          teamName: teamName // Envia o nome da equipe (o backend só salvará se for jogador)
+        })
+      });
+
+      const dataBackend = await resBackend.json();
+      if (!resBackend.ok) throw new Error(dataBackend.error || 'Falha ao salvar no backend');
+      
+      setMessage(dataBackend.message);
+      setFile(null); // Limpa o arquivo
+      
+    } catch (err) {
+      setMessage(`Erro: ${err.message}`);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="animate-fade-in max-w-2xl mx-auto">
+      <h1 className="text-4xl font-bold mb-8">Meu Perfil</h1>
+      <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-xl shadow-2xl">
+        
+        <div className="flex flex-col items-center mb-6">
+          <img 
+            src={preview || 'https://placehold.co/150x150/1a202c/6f42c1?text=Foto'} 
+            alt="Prévia do Perfil" 
+            className="w-40 h-40 rounded-full object-cover border-4 border-gray-700"
+          />
+          <Input 
+            label="Mudar foto de perfil"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files[0])}
+            className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
+          />
+        </div>
+
+        {/* Input condicional para Jogadores */}
+        {userData.tipo === 'jogador' && (
+          <Input 
+            label="Nome da Equipe (Opcional)" 
+            type="text" 
+            value={teamName} 
+            onChange={e => setTeamName(e.target.value)} 
+            placeholder="Ex: LOUD, Furia"
+          />
+        )}
+        
+        {message && (
+          <p className={`text-center mb-4 ${message.startsWith('Erro') ? 'text-red-400' : 'text-teal-300'}`}>{message}</p>
+        )}
+        
+        <Button primary type="submit" disabled={loading}>
+          {loading ? 'Salvando...' : 'Salvar Alterações'}
+        </Button>
+      </form>
     </div>
   );
 }
@@ -1276,32 +1536,61 @@ function PlayerDashboard() {
     </div>
   );
 }
+
 function FanDashboard() {
   const [valor, setValor] = useState(10);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const { user } = useAuth();
+  const { user } = useAuth(); 
+  
+  // A função handleContribute (que você usava) não é mais necessária por enquanto,
+  // mas a deixamos aqui (ou a comentamos) para uso futuro.
+  /*
   const handleContribute = async () => {
     setLoading(true); setMessage('');
     try {
       const token = await user.getIdToken();
       const res = await fetch('http://localhost:3001/api/contributions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
         body: JSON.stringify({ valor: Number(valor) })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao contribuir');
-      setMessage(data.message); setValor(10);
+      setMessage(data.message); setValor(10); 
     } catch (err) {
       setMessage(`Erro: ${err.message}`);
     }
     setLoading(false);
   };
+  */
+
   return (
     <div className="bg-gray-800 p-6 rounded-xl shadow-lg">
-      <h3 className="text-2xl font-semibold mb-4">Apoie a Cena!</h3>
-      <p className="text-gray-400 mb-6">Faça uma doação e ganhe XP de Fã. (R$ 1 = 10 XP)</p>
+      <h3 className="text-2xl font-semibold mb-4 text-center">Apoie a Cena!</h3>
+      
+      {/* --- MODO 1: QR CODE ESTÁTICO (ATIVO AGORA) --- */}
+      <p className="text-gray-400 mb-6 text-center">
+        Contribua para a plataforma via PIX e ajude a manter a comunidade crescendo!
+      </p>
+      <div className="flex flex-col items-center gap-4">
+        <img 
+          src="https://placehold.co/200x200/ffffff/000000?text=QR+Code+PIX" 
+          alt="QR Code PIX" 
+          className="w-48 h-48 rounded-lg"
+          // Substitua o 'src' acima pelo link real do seu QR Code
+        />
+        <p className="text-gray-300 text-sm text-center">
+          Escaneie o QR Code para fazer sua doação. Qualquer valor ajuda a manter a plataforma no ar!
+        </p>
+      </div>
+
+      {/* ---
+      MODO 2: FORMULÁRIO DINÂMICO (PARA O FUTURO)
+      (Seu código original está aqui, comentado)
+      ---
+      
+      <p className="text-gray-400 mb-6 text-center">Faça uma doação e ganhe XP de Fã. (R$ 1 = 10 XP)</p>
       {message && <p className="text-center text-teal-300 mb-4">{message}</p>}
       <div className="flex flex-col md:flex-row items-center gap-4">
         <Input label="Valor (R$)" type="number" value={valor} onChange={e => setValor(e.target.value)} min="5" />
@@ -1309,41 +1598,64 @@ function FanDashboard() {
           {loading ? 'Processando...' : `Contribuir R$ ${valor}`}
         </Button>
       </div>
+      
+      */}
+      
     </div>
   );
 }
 
 // --- PÁGINA RANKING (Sem mudanças) ---
 function RankingPage({ setPage }) {
-  const [playerRanking, setPlayerRanking] = useState([]); // Estado para Jogadores
-  const [fanRanking, setFanRanking] = useState([]);     // Estado para Fãs
+  const [playerRanking, setPlayerRanking] = useState([]); 
+  const [fanRanking, setFanRanking] = useState([]);     
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // --- NOVOS ESTADOS ---
+  const [config, setConfig] = useState({ minXpJogadores: 500, minXpFas: 100 });
+  const [isPlayersExpanded, setIsPlayersExpanded] = useState(false);
+  const [isFansExpanded, setIsFansExpanded] = useState(false);
+  // --- FIM DOS NOVOS ESTADOS ---
 
   useEffect(() => {
-    const fetchRanking = async () => {
-      setLoading(true); setError('');
+    const fetchData = async () => {
+      setLoading(true); 
+      setError('');
       try {
-        const res = await fetch('http://localhost:3001/api/ranking');
-        const data = await res.json();
-        if (res.ok) {
-          setPlayerRanking(data.players); // Seta o ranking de jogadores
-          setFanRanking(data.fans);       // Seta o ranking de fãs
+        // --- MUDANÇA: Busca os rankings E a configuração ---
+        const rankingRes = await fetch('http://localhost:3001/api/ranking');
+        const configRes = await fetch('http://localhost:3001/api/config/ranking');
+        
+        const rankingData = await rankingRes.json();
+        const configData = await configRes.json();
+
+        if (rankingRes.ok) {
+          setPlayerRanking(rankingData.players); 
+          setFanRanking(rankingData.fans);       
+        } else {
+          throw new Error(rankingData.error || 'Erro ao buscar ranking');
         }
-        else throw new Error(data.error || 'Erro ao buscar ranking');
+        
+        if (configRes.ok) {
+          setConfig(configData);
+        } else {
+          throw new Error(configData.error || 'Erro ao buscar config');
+        }
+        // --- FIM DA MUDANÇA ---
+        
       } catch (err) {
         setError(err.message);
       }
       setLoading(false);
     };
-    fetchRanking();
+    fetchData();
   }, []);
 
   if (loading) return <LoadingSpinner text="Carregando Rankings..." />;
   
-  // Se houver um erro, mostre-o.
-  // (O erro de índice do Firestore aparecerá aqui)
   if (error) {
+    // ... (bloco de erro continua o mesmo) ...
     return (
        <div className="animate-fade-in max-w-2xl mx-auto">
         <h1 className="text-4xl font-bold mb-8">Rankings da Comunidade</h1>
@@ -1358,42 +1670,113 @@ function RankingPage({ setPage }) {
     )
   }
 
-  // Componente helper interno para evitar repetição de código
-  const RankingTable = ({ data, title }) => (
-    <div className="bg-gray-800 shadow-2xl rounded-xl overflow-hidden">
-      <h3 className="text-2xl font-semibold text-white p-4">{title}</h3>
-      <table className="w-full text-left">
-        <thead className="bg-gray-700">
-          <tr>
-            <th className="p-4 text-lg font-semibold">Pos.</th>
-            <th className="p-4 text-lg font-semibold">Nome</th>
-            <th className="p-4 text-lg font-semibold">XP Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.length === 0 && (
-            <tr><td colSpan="3" className="p-4 text-center text-gray-400">Ninguém classificado ainda.</td></tr>
-          )}
-          {data.map((item) => (
-            <tr key={item.jogadorId} className="border-b border-gray-700 last:border-b-0 hover:bg-gray-700/50">
-              <td className="p-4 text-xl font-bold text-purple-400">{item.posicao}</td>
-              <td className="p-4 text-lg">{item.nome}</td>
-              <td className="p-4 text-lg font-medium text-teal-300">{item.xpTotal.toFixed(2)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+  // --- COMPONENTE HELPER DE MARCADOR ---
+  const MarkerRow = ({ text }) => (
+    <tr className="bg-gray-900">
+      <td colSpan="3" className="py-2 px-4 text-center">
+        <span className="text-xs font-semibold text-purple-300 uppercase tracking-widest">
+          {text}
+        </span>
+      </td>
+    </tr>
   );
 
-  // Renderiza a página com as duas tabelas
+  // --- COMPONENTE HELPER DE TABELA (ATUALIZADO) ---
+  const RankingTable = ({ data, title, minXp, isExpanded, onToggleExpand }) => {
+    
+    // 1. Fatiar a lista se não estiver expandida
+    const visibleData = isExpanded ? data : data.slice(0, 10);
+    
+    // 2. Encontrar o índice do último jogador qualificado
+    let lastQualifiedIndex = -1;
+    data.forEach((player, index) => {
+      if (player.xpTotal >= minXp) {
+        lastQualifiedIndex = index;
+      }
+    });
+
+    return (
+      <div className="bg-gray-800 shadow-2xl rounded-xl overflow-hidden">
+        <h3 className="text-2xl font-semibold text-white p-4">{title}</h3>
+        <table className="w-full text-left">
+          <thead className="bg-gray-700">
+            <tr>
+              <th className="p-4 text-lg font-semibold w-16">Pos.</th>
+              <th className="p-4 text-lg font-semibold">Nome</th>
+              <th className="p-4 text-lg font-semibold">XP Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.length === 0 && (
+              <tr><td colSpan="3" className="p-4 text-center text-gray-400">Ninguém classificado ainda.</td></tr>
+            )}
+            
+            {/* 3. Mapear os dados VISÍVEIS */}
+            {visibleData.map((item, index) => {
+              // Verifica se o loop 'map' (do visibleData) é o último qualificado
+              const isLastQualified = (index === lastQualifiedIndex);
+              
+              return (
+                // Usamos Fragment (<>) para agrupar a linha do jogador E os marcadores
+                <React.Fragment key={item.jogadorId}>
+                  <tr className="border-b border-gray-700 last:border-b-0 hover:bg-gray-700/50">
+                    <td className="p-4 text-xl font-bold text-purple-400">{item.posicao}</td>
+                    <td className="p-4 text-lg">
+                      <div className="flex items-center gap-3">
+                        <img 
+                          src={item.profileImageUrl || 'https://placehold.co/40x40/1a202c/6f42c1?text=U'} 
+                          alt={item.nome}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                        <span>{item.nome}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 text-lg font-medium text-teal-300">{item.xpTotal.toFixed(2)}</td>
+                  </tr>
+                  
+                  {/* --- LÓGICA DOS MARCADORES --- */}
+                  {index === 2 && <MarkerRow text="Top 3" />}
+                  {index === 9 && isExpanded && <MarkerRow text="Top 10" />}
+                  {isLastQualified && <MarkerRow text={`Mínimo de ${minXp} XP`} />}
+                  {/* --- FIM DA LÓGICA --- */}
+                </React.Fragment>
+              )
+            })}
+          </tbody>
+        </table>
+        
+        {/* 4. Botão de Expandir */}
+        {data.length > 10 && (
+          <div className="p-4 bg-gray-700 text-center">
+            <Button onClick={onToggleExpand}>
+              {isExpanded ? 'Mostrar menos' : `Mostrar todos (${data.length})`}
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Renderiza a página
   return (
     <div className="animate-fade-in">
       <h1 className="text-4xl font-bold mb-8">Rankings da Comunidade</h1>
       
-      <div className="space-y-8"> {/* Adiciona espaço entre as tabelas */}
-        <RankingTable title="Ranking de Jogadores" data={playerRanking} />
-        <RankingTable title="Ranking de Fãs" data={fanRanking} />
+      <div className="space-y-8"> 
+        <RankingTable 
+          title="Ranking de Jogadores" 
+          data={playerRanking} 
+          minXp={config.minXpJogadores}
+          isExpanded={isPlayersExpanded}
+          onToggleExpand={() => setIsPlayersExpanded(!isPlayersExpanded)}
+        />
+        <RankingTable 
+          title="Ranking de Fãs" 
+          data={fanRanking}
+          minXp={config.minXpFas}
+          isExpanded={isFansExpanded}
+          onToggleExpand={() => setIsFansExpanded(!isFansExpanded)}
+        />
       </div>
     </div>
   );
@@ -1404,10 +1787,9 @@ function ChampionshipsPage({ setPage }) {
   const [orgs, setOrgs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedOrg, setSelectedOrg] = useState(null); // Para o modal
+  const [selectedOrg, setSelectedOrg] = useState(null); 
 
   useEffect(() => {
-    // Busca organizações, não campeonatos
     const fetchOrgs = async () => {
       setLoading(true);
       setError('');
@@ -1432,29 +1814,56 @@ function ChampionshipsPage({ setPage }) {
 
   return (
     <div className="animate-fade-in">
-      <h1 className="text-4xl font-bold mb-8">Campeonatos</h1>
+      <h1 className="text-4xl font-bold mb-8">Organizações</h1>
       {orgs.length === 0 && <p className="text-gray-400 text-center">Nenhuma organização registrada ainda.</p>}
-
-      {/* Cards das Organizações */}
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {orgs.map((org) => (
-          <div
-            key={org.id}
-            className="bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-purple-500/30 transition duration-300 cursor-pointer"
+          <div 
+            key={org.id} 
+            className="bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-purple-500/30 transition duration-300 flex flex-col" // <-- Adicionado flex flex-col
             onClick={() => setSelectedOrg(org)}
           >
-            <h3 className="text-2xl font-bold text-teal-300 mb-2">{org.nome}</h3>
-            <p className="text-gray-300 mb-6 line-clamp-2">{org.descricao}</p>
+            <img 
+              src={org.imagemUrl || 'https://placehold.co/400x200/1a202c/6f42c1?text=Capa+da+Org'} 
+              alt={org.nome}
+              className="w-full h-32 object-cover rounded-lg mb-4"
+            />
+            <h3 className="text-2xl font-bold text-teal-300 mb-2 truncate">{org.nome}</h3>
+            <p className="text-gray-300 mb-6 line-clamp-2 h-12">{org.descricao}</p>
+            
+            {/* --- BLOCO DE ÍCONES ADICIONADO --- */}
+            <div className="mb-4 mt-auto pt-4 border-t border-gray-700"> {/* mt-auto empurra para baixo */}
+              <h4 className="text-sm font-semibold text-gray-400 mb-2">Jogos Principais:</h4>
+              <div className="flex gap-2">
+                {/* Se não houver jogos, mostre um placeholder */}
+                {!org.games || org.games.length === 0 ? (
+                  <span className="text-xs text-gray-500 italic">Nenhum campeonato registrado</span>
+                ) : (
+                  // Loop pelo array de slugs de jogos
+                  org.games.map(gameSlug => (
+                    <img
+                      key={gameSlug}
+                      src={GAME_MAP[gameSlug]?.icon || 'https://placehold.co/30x30/1a202c/fff?text=?'} // Usa o mapa
+                      alt={GAME_MAP[gameSlug]?.name || 'Jogo'}
+                      title={GAME_MAP[gameSlug]?.name || 'Jogo'}
+                      className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+            {/* --- FIM DO BLOCO DE ÍCONES --- */}
+            
             <Button>Ver Campeonatos</Button>
           </div>
         ))}
       </div>
-
-      {/* O Modal (renderização condicional) */}
+      
       {selectedOrg && (
-        <ChampionshipsModal
-          org={selectedOrg}
-          onClose={() => setSelectedOrg(null)}
+        <ChampionshipsModal 
+          org={selectedOrg} 
+          onClose={() => setSelectedOrg(null)} 
         />
       )}
     </div>
@@ -1466,6 +1875,9 @@ function ChampionshipsModal({ org, onClose }) {
   const [champs, setChamps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // --- NOVO: Estado para o histórico ---
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     // Busca campeonatos da organização selecionada
@@ -1476,7 +1888,7 @@ function ChampionshipsModal({ org, onClose }) {
         const res = await fetch(`http://localhost:3001/api/organizacoes/${org.id}/championships`);
         const data = await res.json();
         if (res.ok) {
-          setChamps(data);
+          setChamps(data); // A rota já retorna ordenado por data
         } else {
           throw new Error(data.error || 'Erro ao buscar campeonatos');
         }
@@ -1487,15 +1899,18 @@ function ChampionshipsModal({ org, onClose }) {
     };
     fetchChamps();
   }, [org.id]); // Roda sempre que o 'org' mudar
+  
+  // Separa o último campeonato do restante
+  const latestChamp = champs.length > 0 ? champs[0] : null;
+  const oldChamps = champs.length > 1 ? champs.slice(1) : [];
 
   return (
     // Fundo do Modal
-    <div
+    <div 
       className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
       onClick={onClose} // Fecha ao clicar fora
     >
-      {/* Conteúdo do Modal */}
-      <div
+      <div 
         className="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()} // Impede de fechar ao clicar dentro
       >
@@ -1503,38 +1918,39 @@ function ChampionshipsModal({ org, onClose }) {
           <h2 className="text-3xl font-bold text-teal-300">Campeonatos de {org.nome}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
         </div>
-
+        
         {loading && <LoadingSpinner text="Buscando campeonatos..." />}
         {error && <p className="text-red-400 text-center">{error}</p>}
-
+        
         {!loading && !error && (
           <div className="flex flex-col gap-4">
             {champs.length === 0 && <p className="text-gray-400">Nenhum campeonato encontrado para esta organização.</p>}
-
-            {/* Lista de Campeonatos */}
-            {champs.map(champ => (
-              <div key={champ.id} className="bg-gray-700 p-4 rounded-lg">
-                <h4 className="text-xl font-semibold text-white">{champ.nome}</h4>
-                <p className="text-sm text-gray-400 mb-2">Data: {new Date(champ.data.seconds * 1000).toLocaleDateString('pt-BR')} | XP: {champ.xpTotal}</p>
-                <p className="text-sm text-gray-300 mb-3">{champ.descricao}</p>
-
-                {/* Lista de Resultados (Participantes) */}
-                <h5 className="text-md font-semibold text-purple-300 mb-2">Resultados</h5>
-                <div className="text-sm">
-                  {champ.participantes.length === 0 && <p className="text-gray-400 italic">Resultados ainda não lançados.</p>}
-                  {champ.participantes
-                    .sort((a, b) => a.posicao - b.posicao) // Ordena por posição
-                    .map(p => (
-                      <div key={p.jogadorId} className="flex justify-between p-1 border-b border-gray-600 last:border-b-0">
-                        <span className="text-gray-300">
-                          {p.posicao <= 8 ? `${p.posicao}º` : '9º+'}
-                        </span>
-                        <span className="text-teal-300">+{p.xpGanho.toFixed(2)} XP</span>
-                      </div>
-                    ))}
-                </div>
+            
+            {latestChamp && (
+              <div>
+                <h3 className="text-xl font-semibold text-white mb-2">Último Evento</h3>
+                <ChampResultCard champ={latestChamp} />
               </div>
-            ))}
+            )}
+            
+            {oldChamps.length > 0 && (
+              <div className="mt-4">
+                <Button 
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="w-full bg-gray-600 text-white hover:bg-gray-500"
+                >
+                  {showHistory ? 'Esconder Histórico' : `Ver Histórico (${oldChamps.length} eventos)`}
+                </Button>                
+                {showHistory && (
+                  <div className="space-y-4 mt-4">
+                    {oldChamps.map(champ => (
+                      <ChampResultCard key={champ.id} champ={champ} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
         )}
       </div>
@@ -1542,6 +1958,46 @@ function ChampionshipsModal({ org, onClose }) {
   );
 }
 
+// Este card é reutilizável para o "Último" e para o "Histórico"
+function ChampResultCard({ champ }) {
+  const participantesOrdenados = champ.participantes ? 
+    champ.participantes.sort((a, b) => a.posicao - b.posicao) : 
+    []; 
+
+  // --- LÓGICA DE DATA CORRIGIDA ---
+  // Tenta ler .seconds (para dados ao vivo do Firebase)
+  // Se falhar, tenta ler o champ.data diretamente (para dados da API)
+  const dataValida = champ.data?.seconds ? new Date(champ.data.seconds * 1000) : new Date(champ.data);
+  const dataFormatada = !isNaN(dataValida) ? dataValida.toLocaleDateString('pt-BR') : "Data Inválida";
+  // --- FIM DA CORREÇÃO ---
+
+  return (
+    <div className="bg-gray-700 p-4 rounded-lg">
+      <h4 className="text-xl font-semibold text-white">{champ.nome}</h4>
+      <p className="text-sm text-gray-400 mb-2">Data: {dataFormatada} | XP Base: {champ.xpTotal}</p>
+      <p className="text-sm text-gray-300 mb-3">{champ.descricao}</p>
+      
+      <h5 className="text-md font-semibold text-purple-300 mb-2">Resultados</h5>
+      <div className="text-sm max-h-40 overflow-y-auto">
+        {participantesOrdenados.length === 0 && (
+          <p className="text-gray-400 italic">Resultados ainda não lançados.</p>
+        )}
+        {participantesOrdenados.map((p, index) => (
+          <div 
+            key={`${p.jogadorId}-${p.posicao}-${index}`} 
+            className="flex justify-between items-center p-1 border-b border-gray-600 last:border-b-0"
+          >
+            <span className="text-gray-300 w-10">
+              {p.posicao <= 8 ? `${p.posicao}º` : '9º+'}
+            </span>
+            <span className="text-white truncate mx-2 flex-1">{p.nome}</span> 
+            <span className="text-teal-300 w-24 text-right">+{p.xpGanho.toFixed(2)} XP</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // --- PÁGINA ADMIN ---
 function AdminPage() {
@@ -1558,18 +2014,22 @@ function AdminPage() {
       <div>
         {activeTab === 'championships' && <CreateChampionshipForm />}
         {activeTab === 'donations' && <CreateDonationForm />}
-        {activeTab === 'organizations' && <ManageOrganizationsForm />}
         
-        {/* --- CONTEÚDO DA ABA ATUALIZADO --- */}
+        {activeTab === 'organizations' && (
+          // --- MUDANÇA AQUI ---
+          // Agora a aba tem 3 seções
+          <div className="space-y-10">
+            <ManageOrganizationsForm />
+            <ManageRankingConfigCard /> {/* <-- CARD ADICIONADO */}
+            <ResetRankingCard /> 
+          </div>
+          // --- FIM DA MUDANÇA ---
+        )}
+        
         {activeTab === 'results' && (
           <div className="space-y-10">
-            {/* O formulário original (Padrão) */}
             <FinalizeChampionshipForm />
-            
-            {/* Divisor */}
             <hr className="border-gray-500 border-dashed" />
-            
-            {/* O novo formulário (Customizado) */}
             <FinalizeChampionshipFormCustom />
           </div>
         )}
@@ -1583,30 +2043,27 @@ function AdminPage() {
 function CreateChampionshipForm() {
   const { user, userData } = useAuth(); 
   
-  // Estados do formulário
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
   const [data, setData] = useState(new Date().toISOString().split('T')[0]); 
-  
-  // 'xpTotal' agora é o OVERRIDE. Começa vazio.
   const [xpTotal, setXpTotal] = useState(''); 
-  const [xpBaseAutomatico, setXpBaseAutomatico] = useState(1000); // O XP que vem da org
-  
+  const [xpBaseAutomatico, setXpBaseAutomatico] = useState(1000); 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  
+  // --- NOVO ESTADO PARA O JOGO ---
+  const [gameSlug, setGameSlug] = useState(Object.keys(GAME_MAP)[0]); // Seleciona o primeiro jogo da lista
+  // --- FIM ---
 
-  // Estados para o Admin Global
   const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
   const [orgsList, setOrgsList] = useState([]);
   const [selectedOrgId, setSelectedOrgId] = useState(''); 
 
-  // Busca dados das organizações (para o select do Admin ou XP automático do Organizador)
   useEffect(() => {
+    // ... (Este useEffect continua o MESMO) ...
     if (!userData) return;
-
     const fetchOrgsData = async () => {
       try {
-        // Se for Admin Global, busca TODAS as orgs
         if (userData.admin === true && userData.tipo !== 'organizador') {
           setIsGlobalAdmin(true);
           const res = await fetch('http://localhost:3001/api/organizacoes');
@@ -1615,16 +2072,15 @@ function CreateChampionshipForm() {
             setOrgsList(data);
             if (data.length > 0) {
               setSelectedOrgId(data[0].id);
-              setXpBaseAutomatico(data[0].xpBase || 1000); // Pega o XP da primeira org
+              setXpBaseAutomatico(data[0].xpBase || 1000); 
             }
           }
         } 
-        // Se for um Organizador, busca SÓ a sua org
         else if (userData.tipo === 'organizador' && userData.organizacaoId) {
           const res = await fetch(`http://localhost:3001/api/organizacoes/${userData.organizacaoId}`);
           const data = await res.json();
           if (res.ok) {
-            setXpBaseAutomatico(data.xpBase || 1000); // Pega o XP da sua org
+            setXpBaseAutomatico(data.xpBase || 1000); 
           }
         }
       } catch (err) {
@@ -1632,10 +2088,10 @@ function CreateChampionshipForm() {
       }
     };
     fetchOrgsData();
-  }, [userData]); // Roda quando o userData é carregado
+  }, [userData]); 
 
-  // ATUALIZA O XP AUTOMÁTICO QUANDO O ADMIN GLOBAL MUDA A ORG
   useEffect(() => {
+    // ... (Este useEffect continua o MESMO) ...
     if (isGlobalAdmin && orgsList.length > 0) {
       const orgSelecionada = orgsList.find(org => org.id === selectedOrgId);
       if (orgSelecionada) {
@@ -1661,8 +2117,7 @@ function CreateChampionshipForm() {
         nome, 
         descricao, 
         data, 
-        // Envia o 'xpTotal' (override) apenas se ele for preenchido
-        // Se estiver vazio, o backend usará o automático
+        game: gameSlug, // <-- CAMPO ADICIONADO
         xpTotal: Number(xpTotal) > 0 ? Number(xpTotal) : null,
         organizadorId: isGlobalAdmin ? selectedOrgId : null 
       };
@@ -1676,9 +2131,10 @@ function CreateChampionshipForm() {
       const resData = await res.json();
       if (!res.ok) throw new Error(resData.error || 'Erro ao criar campeonato');
       setMessage(`Campeonato "${nome}" criado com sucesso!`);
-      // Limpa formulário, inclusive o override de XP
+      
       setNome(''); setDescricao(''); setXpTotal(''); 
       setData(new Date().toISOString().split('T')[0]);
+      
     } catch (err) {
       setMessage(`Erro: ${err.message}`);
     }
@@ -1703,19 +2159,32 @@ function CreateChampionshipForm() {
       ) : (
         <p className="text-sm text-gray-400 mb-4 -mt-4">Seu campeonato será criado sob sua organização.</p>
       )}
+
+      {/* --- NOVO SELETOR DE JOGO --- */}
+      <Select 
+        label="Jogo Principal" 
+        value={gameSlug} 
+        onChange={e => setGameSlug(e.target.value)}
+      >
+        {Object.keys(GAME_MAP).map(slug => (
+          <option key={slug} value={slug}>
+            {GAME_MAP[slug].name}
+          </option>
+        ))}
+      </Select>
+      {/* --- FIM DO SELETOR --- */}
       
       <Input label="Nome do Campeonato" type="text" value={nome} onChange={e => setNome(e.target.value)} required />
       <Input label="Descrição" type="text" value={descricao} onChange={e => setDescricao(e.target.value)} />
       <Input label="Data" type="date" value={data} onChange={e => setData(e.target.value)} required />
       
-      {/* --- INPUT DE XP MODIFICADO --- */}
       <Input 
         label="XP Base (Opcional - Override)" 
         type="number" 
         value={xpTotal} 
         onChange={e => setXpTotal(e.target.value)} 
         min="0"
-        placeholder={`Automático: ${xpBaseAutomatico} XP`} // Mostra o XP automático
+        placeholder={`Automático: ${xpBaseAutomatico} XP`} 
       />
       
       {message && (
@@ -1725,6 +2194,7 @@ function CreateChampionshipForm() {
     </form>
   );
 }
+
 // Aba Organizações
 function ManageOrganizationsForm() {
   const { user, userData } = useAuth();
@@ -1883,42 +2353,294 @@ function ManageOrganizationsForm() {
     </form>
   );
 }
-// (Formulário CreateDonationForm sem mudanças)
-function CreateDonationForm() {
+
+// --- (ADICIONE ESTE NOVO COMPONENTE) ---
+function ManageRankingConfigCard() {
   const { user } = useAuth();
-  const [patrocinador, setPatrocinador] = useState('');
-  const [valorTotal, setValorTotal] = useState(500);
-  const [atividade, setAtividade] = useState('');
-  const [xpOferecido, setXpOferecido] = useState(0);
+  const [minXpJogadores, setMinXpJogadores] = useState(500);
+  const [minXpFas, setMinXpFas] = useState(100);
+  
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-
-  const handleCreateDonation = async (e) => {
-    e.preventDefault(); setLoading(true); setMessage('');
+  
+  // Efeito para buscar as configurações atuais
+  useEffect(() => {
+    setLoading(true);
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/api/config/ranking');
+        const data = await res.json();
+        if (res.ok) {
+          setMinXpJogadores(data.minXpJogadores);
+          setMinXpFas(data.minXpFas);
+        } else {
+          throw new Error(data.error || 'Erro ao carregar');
+        }
+      } catch (err) {
+        setMessage(`Erro ao carregar: ${err.message}`);
+      }
+      setLoading(false);
+    };
+    fetchConfig();
+  }, []); // Roda uma vez
+  
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+    
     try {
       const token = await user.getIdToken();
-      const res = await fetch('http://localhost:3001/api/donations', {
+      const res = await fetch('http://localhost:3001/api/config/ranking', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ patrocinador, valorTotal: Number(valorTotal), atividade, xpOferecido: Number(xpOferecido) })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+        body: JSON.stringify({ 
+          minXpJogadores: Number(minXpJogadores), 
+          minXpFas: Number(minXpFas) 
+        })
       });
-      const resData = await res.json();
-      if (!res.ok) throw new Error(resData.error || 'Erro ao registrar');
-      setMessage(`Patrocínio de "${patrocinador}" registrado com sucesso!`);
-      setPatrocinador(''); setValorTotal(500); setAtividade(''); setXpOferecido(0);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao salvar');
+      
+      setMessage(data.message);
     } catch (err) {
       setMessage(`Erro: ${err.message}`);
     }
     setLoading(false);
   };
+  
+  return (
+    <form onSubmit={handleSave} className="bg-gray-800 p-6 rounded-xl shadow-2xl">
+      <h2 className="text-2xl font-semibold text-white mb-6">Configuração do Ranking</h2>
+      <p className="text-gray-400 text-sm mb-4">
+        Defina o XP mínimo necessário para que um usuário seja considerado "qualificado" no ranking sazonal (para a marcação visual).
+      </p>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input 
+          label="XP Mínimo (Jogadores)" 
+          type="number" 
+          value={minXpJogadores} 
+          onChange={e => setMinXpJogadores(e.target.value)} 
+          min="0" 
+        />
+        <Input 
+          label="XP Mínimo (Fãs)" 
+          type="number" 
+          value={minXpFas} 
+          onChange={e => setMinXpFas(e.target.value)} 
+          min="0" 
+        />
+      </div>
+      
+      {message && (
+        <p className={`text-center my-4 ${message.startsWith('Erro') ? 'text-red-400' : 'text-teal-300'}`}>{message}</p>
+      )}
+      
+      <Button primary type="submit" disabled={loading} className="mt-4">
+        {loading ? 'Salvando...' : 'Salvar Configurações'}
+      </Button>
+    </form>
+  );
+}
+
+// Resetar ranking
+function ResetRankingCard() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const handleReset = async () => {
+    setMessage('');
+    
+    // Dupla confirmação de segurança
+    if (!window.confirm("ATENÇÃO: Você está prestes a ZERAR o XP de TODOS os jogadores e fãs. Esta ação é irreversível.")) {
+      return;
+    }
+    if (!window.confirm("CONFIRMAÇÃO FINAL: Tem certeza ABSOLUTA que deseja resetar o ranking mensal?")) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('http://localhost:3001/api/admin/ranking/reset', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao resetar');
+      
+      setMessage(data.message); // Mensagem de sucesso
+    } catch (err) {
+      setMessage(`Erro: ${err.message}`);
+    }
+    setLoading(false);
+  };
+  
+  return (
+    <div className="bg-gray-700 p-6 rounded-xl shadow-2xl mt-10 border-t-4 border-red-500">
+      <h2 className="text-2xl font-semibold text-red-300 mb-4">Zona de Perigo: Resetar Ranking Mensal</h2>
+      <p className="text-gray-300 mb-4">
+        Ao clicar no botão abaixo, o campo `xpTotal` de **todos os usuários** (jogadores, fãs, organizadores) será permanentemente definido como **zero**.
+      </p>
+      <p className="text-gray-400 text-sm mb-4 italic">
+        Isso NÃO afeta o histórico de campeonatos, missões completas, o 'Total Arrecadado' (R$) ou qualquer outro dado histórico. Apenas o ranking de XP.
+      </p>
+      
+      {message && (
+        <p className={`text-center mb-4 ${message.startsWith('Erro') ? 'text-red-400' : 'text-teal-300'}`}>{message}</p>
+      )}
+      
+      <Button 
+        onClick={handleReset}
+        disabled={loading}
+        className="bg-red-700 text-white hover:bg-red-600 w-full"
+      >
+        {loading ? 'Resetando...' : 'Zerar Ranking Mensal de TODO MUNDO'}
+      </Button>
+    </div>
+  );
+}
+// (Formulário CreateDonationForm)
+function CreateDonationForm() {
+  const { user } = useAuth();
+  
+  // Estado para o toggle
+  const [donationType, setDonationType] = useState('corporate'); // 'corporate' ou 'fan'
+  
+  // Estados do formulário
+  const [patrocinador, setPatrocinador] = useState(''); // Para 'corporate'
+  const [selectedFanId, setSelectedFanId] = useState(''); // Para 'fan'
+  const [valorTotal, setValorTotal] = useState(500);
+  const [atividade, setAtividade] = useState('');
+  const [xpOferecido, setXpOferecido] = useState(0);
+  
+  // Estado para a lista de fãs
+  const [fanList, setFanList] = useState([]);
+  
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  // Busca a lista de fãs (para o seletor 'fan')
+  useEffect(() => {
+    const fetchFans = async () => {
+      if (!user) return;
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch('http://localhost:3001/api/fans', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setFanList(data);
+          if (data.length > 0) setSelectedFanId(data[0].id); // Seleciona o primeiro
+        }
+      } catch (err) {
+        console.error("Erro ao buscar fãs:", err);
+      }
+    };
+    fetchFans();
+  }, [user]);
+
+  const handleCreateDonation = async (e) => {
+    e.preventDefault();
+    setLoading(true); setMessage('');
+    
+    // Monta o body da requisição
+    const body = {
+      tipo: donationType,
+      patrocinador: donationType === 'corporate' ? patrocinador : null,
+      fanId: donationType === 'fan' ? selectedFanId : null,
+      valorTotal: Number(valorTotal),
+      atividade,
+      xpOferecido: Number(xpOferecido)
+    };
+    
+    // Validação
+    if (donationType === 'corporate' && !body.patrocinador) {
+      setMessage('Erro: Nome do patrocinador corporativo é obrigatório.');
+      setLoading(false);
+      return;
+    }
+    if (donationType === 'fan' && !body.fanId) {
+      setMessage('Erro: Você deve selecionar um fã.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('http://localhost:3001/api/donations', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+        body: JSON.stringify(body)
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Erro ao registrar');
+      
+      setMessage(resData.message); // Exibe a msg de sucesso (ex: "Fã recebeu XP!")
+      
+      // Limpa formulário
+      setPatrocinador(''); setSelectedFanId(fanList[0]?.id || ''); setValorTotal(500);
+      setAtividade(''); setXpOferecido(0);
+    } catch (err) {
+      setMessage(`Erro: ${err.message}`);
+    }
+    setLoading(false);
+  };
+  
+  const handleTypeChange = (newType) => {
+    setDonationType(newType);
+    setMessage(''); // Limpa mensagens
+  };
 
   return (
     <form onSubmit={handleCreateDonation} className="bg-gray-800 p-6 rounded-xl shadow-2xl">
-      <h2 className="text-2xl font-semibold text-white mb-6">Novo Patrocínio (Donation)</h2>
-      <Input label="Nome do Patrocinador" type="text" value={patrocinador} onChange={e => setPatrocinador(e.target.value)} required />
+      <h2 className="text-2xl font-semibold text-white mb-4">Novo Patrocínio (Donation)</h2>
+      
+      {/* --- NOVO: Toggle de Tipo --- */}
+      <div className="flex mb-4 rounded-lg bg-gray-700 p-1">
+        <button
+          type="button"
+          onClick={() => handleTypeChange('corporate')}
+          className={`w-1/2 py-2 rounded-md font-semibold ${donationType === 'corporate' ? 'bg-purple-600 text-white' : 'text-gray-400'}`}
+        >
+          Corporativo
+        </button>
+        <button
+          type="button"
+          onClick={() => handleTypeChange('fan')}
+          className={`w-1/2 py-2 rounded-md font-semibold ${donationType === 'fan' ? 'bg-purple-600 text-white' : 'text-gray-400'}`}
+        >
+          Bônus para Fã
+        </button>
+      </div>
+
+      {/* --- Inputs Condicionais --- */}
+      {donationType === 'corporate' ? (
+        <Input label="Nome do Patrocinador (Ex: Coca-Cola)" type="text" value={patrocinador} onChange={e => setPatrocinador(e.target.value)} required />
+      ) : (
+        <UserSearchSelect
+          label="Selecione o Fã"
+          users={fanList}
+          selectedUser={selectedFanId}
+          onSelect={setSelectedFanId}
+        />
+      )}
+
       <Input label="Atividade / Causa" type="text" value={atividade} onChange={e => setAtividade(e.target.value)} placeholder="Ex: Patrocínio do Major de SP" required />
       <Input label="Valor Total (R$)" type="number" value={valorTotal} onChange={e => setValorTotal(e.target.value)} min="0" required />
-      <Input label="XP Bônus Oferecido" type="number" value={xpOferecido} onChange={e => setXpOferecido(e.target.value)} min="0" />
+      <Input 
+        label="XP Bônus Oferecido (para Fã)" 
+        type="number" 
+        value={xpOferecido} 
+        onChange={e => setXpOferecido(e.target.value)} 
+        min="0" 
+        disabled={donationType === 'corporate'} // Desabilita se for corporativo
+      />
+      {donationType === 'corporate' && <p className="text-xs text-gray-500 -mt-3 mb-4">XP Bônus só é aplicado para "Bônus para Fã".</p>}
+      
       {message && (
         <p className={`text-center mb-4 ${message.startsWith('Erro') ? 'text-red-400' : 'text-teal-300'}`}>{message}</p>
       )}
@@ -1929,141 +2651,152 @@ function CreateDonationForm() {
 
 // --- FORMULÁRIO DE RESULTADOS (MODIFICADO) ---
 function FinalizeChampionshipForm() {
-  const { user } = useAuth();
-  const [championships, setChampionships] = useState([]); // Agora são SÓ os campeonatos do admin
+  const { user, userData } = useAuth();
+  const [championships, setChampionships] = useState([]);
   const [allPlayers, setAllPlayers] = useState([]);
   const [selectedChamp, setSelectedChamp] = useState('');
+  // O estado 'top8Players' agora guarda o ID ou a string "manual"
   const [top8Players, setTop8Players] = useState({ 1: '', 2: '', 3: '', 4: '', 5: '', 6: '', 7: '', 8: '', });
-  const [participationPlayers, setParticipationPlayers] = useState([]);
+  // NOVO: Estado para os nomes manuais
+  const [manualNames, setManualNames] = useState({ 1: '', 2: '', 3: '', 4: '', 5: '', 6: '', 7: '', 8: '' });
+  
+  const [participationPlayers, setParticipationPlayers] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
+    // ... (useEffect de busca de dados continua o mesmo) ...
     const fetchData = async () => {
-      if (!user) return;
-      setLoadingData(true);
+      if (!user || !userData) return; setLoadingData(true); setMessage(''); 
       try {
         const token = await user.getIdToken();
         const headers = { 'Authorization': `Bearer ${token}` };
-
-        // --- MUDANÇA AQUI ---
-        // 1. Busca SÓ os campeonatos do admin
         const champsRes = await fetch('http://localhost:3001/api/admin/my-championships', { headers });
         const champsData = await champsRes.json();
         if (champsRes.ok) {
-          setChampionships(champsData);
-          if (champsData.length > 0) setSelectedChamp(champsData[0].id);
-        } else {
-          throw new Error(champsData.error || 'Erro ao buscar seus campeonatos');
-        }
-
-        // 2. Busca todos os jogadores (sem mudança)
+          const abertos = champsData.filter(c => c.status !== 'finalizado');
+          setChampionships(abertos);
+          if (abertos.length > 0) setSelectedChamp(abertos[0].id);
+        } else { throw new Error(champsData.error || 'Erro ao buscar seus campeonatos'); }
         const playersRes = await fetch('http://localhost:3001/api/players', { headers });
         const playersData = await playersRes.json();
-        if (playersRes.ok) {
-          setAllPlayers(playersData);
-        } else {
-          throw new Error(playersData.error || 'Erro ao buscar jogadores');
-        }
-      } catch (err) {
-        setMessage(`Erro ao carregar dados: ${err.message}`);
-      }
+        if (playersRes.ok) { setAllPlayers(playersData); } 
+        else { throw new Error(playersData.error || 'Erro ao buscar jogadores'); }
+      } catch (err) { setMessage(`Erro ao carregar dados: ${err.message}`); }
       setLoadingData(false);
     };
     fetchData();
-  }, [user]);
+  }, [user, userData]); 
 
   const handleTop8Change = (position, playerId) => {
     setTop8Players(prev => ({ ...prev, [position]: playerId, }));
   };
+  // NOVO: Handler para o input de nome manual
+  const handleManualNameChange = (position, name) => {
+    setManualNames(prev => ({ ...prev, [position]: name }));
+  };
+
   const handleParticipationSelect = (player) => {
     setParticipationPlayers(prev => [...prev, player]);
   };
   const handleParticipationDeselect = (player) => {
     setParticipationPlayers(prev => prev.filter(p => p.id !== player.id));
   };
-
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedChamp) {
-      setMessage('Erro: Selecione um campeonato.');
-      return;
-    }
-    setLoading(true);
-    setMessage('');
-
+    if (!selectedChamp) { setMessage('Erro: Selecione um campeonato.'); return; }
+    setLoading(true); setMessage('');
+    
+    // --- LÓGICA DO SUBMIT ATUALIZADA ---
     const top8Data = Object.entries(top8Players)
-      .filter(([pos, id]) => id)
-      .map(([pos, id]) => ({ jogadorId: id, posicao: parseInt(pos, 10) }));
+      .filter(([pos, id]) => id) // Filtra posições não preenchidas
+      .map(([pos, id]) => {
+        const posicao = parseInt(pos, 10);
+        if (id === 'manual') {
+          // Se for manual, envia o nome manual e 0 XP
+          return { jogadorId: null, nomeManual: manualNames[pos], posicao: posicao };
+        } else {
+          // Se for jogador, envia o ID
+          return { jogadorId: id, nomeManual: null, posicao: posicao };
+        }
+      });
+    // --- FIM DA LÓGICA ---
+      
     const participationData = participationPlayers.map(p => p.id);
-
     try {
       const token = await user.getIdToken();
       const res = await fetch(`http://localhost:3001/api/admin/championships/${selectedChamp}/finalize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
         body: JSON.stringify({ top8: top8Data, participation: participationData })
       });
       const resData = await res.json();
       if (!res.ok) throw new Error(resData.error || 'Erro ao registrar resultado');
-      setMessage(resData.message);
+      setMessage(resData.message); 
       setTop8Players({ 1: '', 2: '', 3: '', 4: '', 5: '', 6: '', 7: '', 8: '' });
+      setManualNames({ 1: '', 2: '', 3: '', 4: '', 5: '', 6: '', 7: '', 8: '' });
       setParticipationPlayers([]);
+      
+      const newList = championships.filter(c => c.id !== selectedChamp);
+      setChampionships(newList);
+      setSelectedChamp(newList.length > 0 ? newList[0].id : '');
+
     } catch (err) {
       setMessage(`Erro: ${err.message}`);
     }
     setLoading(false);
   };
-
+  
   if (loadingData) {
     return <LoadingSpinner text="Carregando campeonatos e jogadores..." />
   }
 
   return (
     <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-xl shadow-2xl">
-      <h2 className="text-2xl font-semibold text-white mb-6">Lançar Resultados do Campeonato</h2>
-
-      {/* O Select agora só mostra os camps daquele admin */}
-      <Select label="Selecione o Campeonato da sua Organização" value={selectedChamp} onChange={e => setSelectedChamp(e.target.value)} required>
+      <h2 className="text-2xl font-semibold text-white mb-6">Lançar Resultado Padrão (Baseado em XP)</h2>
+      {message && (
+        <p className={`text-center mb-4 ${message.startsWith('Erro') ? 'text-red-400' : 'text-teal-300'}`}>{message}</p>
+      )}
+      <Select label="Selecione o Campeonato (Abertos)" value={selectedChamp} onChange={e => setSelectedChamp(e.target.value)} required>
         {championships.length === 0 ? (
-          <option>Nenhum campeonato criado pela sua organização</option>
+          <option>Nenhum campeonato aberto encontrado</option>
         ) : (
           championships.map(champ => (
-            <option key={champ.id} value={champ.id}>{champ.nome} (XP Base: {champ.xpTotal})</option>
+            <option key={champ.id} value={champ.id}>{champ.nome} {userData.tipo === 'admin' ? `(${champ.organizadorNome})` : ''}</option>
           ))
         )}
       </Select>
-
       <hr className="border-gray-600 my-6" />
       <h3 className="text-lg font-semibold text-gray-200 mb-4">Vencedores (Top 8)</h3>
       <div className="grid grid-cols-2 gap-4">
         {[1, 2, 3, 4, 5, 6, 7, 8].map(pos => (
-          <Select key={pos} label={`${pos}º Lugar`} value={top8Players[pos]} onChange={e => handleTop8Change(pos, e.target.value)}>
-            <option value="">-- Selecione um Jogador --</option>
-            {allPlayers.map(player => (
-              <option key={player.id} value={player.id}>{player.nome}</option>
-            ))}
-          </Select>
+          // --- MUDANÇA: Renderização condicional do input manual ---
+          <div key={pos}>
+            <Select label={`${pos}º Lugar`} value={top8Players[pos]} onChange={e => handleTop8Change(pos, e.target.value)}>
+              <option value="">-- Selecione um Jogador --</option>
+              <option value="manual">-- Inserir Manualmente --</option>
+              {allPlayers.map(player => ( <option key={player.id} value={player.id}>{player.nome}</option> ))}
+            </Select>
+            {top8Players[pos] === 'manual' && (
+              <Input 
+                type="text"
+                placeholder="Nome do Jogador não cadastrado"
+                value={manualNames[pos]}
+                onChange={e => handleManualNameChange(pos, e.target.value)}
+                className="mt-2"
+              />
+            )}
+          </div>
+          // --- FIM DA MUDANÇA ---
         ))}
       </div>
-
       <hr className="border-gray-600 my-6" />
       <h3 className="text-lg font-semibold text-gray-200 mb-4">Participação (9º+)</h3>
       <p className="text-sm text-gray-400 mb-4">Adicione todos os outros jogadores que participaram e ganharão 10% do XP Base.</p>
-
-      <PlayerMultiSelect
-        label="Adicionar Jogadores (9º+)"
-        players={allPlayers}
-        selectedPlayers={participationPlayers}
-        onSelect={handleParticipationSelect}
-        onDeselect={handleParticipationDeselect}
-      />
-
-      {message && (
-        <p className={`text-center my-4 ${message.startsWith('Erro') ? 'text-red-400' : 'text-teal-300'}`}>{message}</p>
-      )}
-
+      <PlayerMultiSelect label="Adicionar Jogadores (9º+)" players={allPlayers} selectedPlayers={participationPlayers} onSelect={handleParticipationSelect} onDeselect={handleParticipationDeselect} />
+      
       <Button primary type="submit" disabled={loading || allPlayers.length === 0 || championships.length === 0}>
         {loading ? 'Finalizando...' : 'Finalizar e Distribuir XP'}
       </Button>
@@ -2078,55 +2811,53 @@ function FinalizeChampionshipFormCustom() {
   const [allPlayers, setAllPlayers] = useState([]);
   const [selectedChamp, setSelectedChamp] = useState('');
   
-  // Estado para os 8 inputs de XP (player ID e XP)
-  const [top8Data, setTop8Data] = useState({
-    1: { id: '', xp: '' }, 2: { id: '', xp: '' }, 3: { id: '', xp: '' }, 4: { id: '', xp: '' },
-    5: { id: '', xp: '' }, 6: { id: '', xp: '' }, 7: { id: '', xp: '' }, 8: { id: '', xp: '' },
-  });
+  const [top8Data, setTop8Data] = useState({ 1: { id: '', xp: '' }, 2: { id: '', xp: '' }, 3: { id: '', xp: '' }, 4: { id: '', xp: '' }, 5: { id: '', xp: '' }, 6: { id: '', xp: '' }, 7: { id: '', xp: '' }, 8: { id: '', xp: '' }, });
+  // NOVO: Estado para os nomes manuais
+  const [manualCustomNames, setManualCustomNames] = useState({ 1: '', 2: '', 3: '', 4: '', 5: '', 6: '', 7: '', 8: '' });
   
   const [participationPlayers, setParticipationPlayers] = useState([]); 
-  const [participationXp, setParticipationXp] = useState(10); // XP Padrão 9+
-  
+  const [participationXp, setParticipationXp] = useState(10); 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [loadingData, setLoadingData] = useState(true);
 
-  // Efeito para buscar dados (campeonatos e jogadores)
   useEffect(() => {
+    // ... (useEffect de busca de dados continua o mesmo) ...
     const fetchData = async () => {
-      if (!user || !userData) return;
-      setLoadingData(true);
+      if (!user || !userData) return; setLoadingData(true); setMessage(''); 
       try {
         const token = await user.getIdToken();
         const headers = { 'Authorization': `Bearer ${token}` };
-        
-        // 1. Busca campeonatos (agora usa a rota corrigida que funciona para Admin e Org)
         const champsRes = await fetch('http://localhost:3001/api/admin/my-championships', { headers });
         const champsData = await champsRes.json();
         if (champsRes.ok) {
-          setChampionships(champsData);
-          if (champsData.length > 0) setSelectedChamp(champsData[0].id); 
+          const abertos = champsData.filter(c => c.status !== 'finalizado');
+          setChampionships(abertos);
+          if (abertos.length > 0) setSelectedChamp(abertos[0].id);
         } else { throw new Error(champsData.error || 'Erro ao buscar seus campeonatos'); }
-        
-        // 2. Busca jogadores
         const playersRes = await fetch('http://localhost:3001/api/players', { headers });
         const playersData = await playersRes.json();
         if (playersRes.ok) { setAllPlayers(playersData); } 
         else { throw new Error(playersData.error || 'Erro ao buscar jogadores'); }
-        
       } catch (err) { setMessage(`Erro ao carregar dados: ${err.message}`); }
       setLoadingData(false);
     };
     fetchData();
-  }, [user, userData]); // Roda quando o usuário carrega
+  }, [user, userData]); 
 
-  // Handlers para os inputs customizados
+  // --- HANDLERS ATUALIZADOS ---
   const handleTop8PlayerChange = (pos, playerId) => {
-    setTop8Data(prev => ({ ...prev, [pos]: { ...prev[pos], id: playerId } }));
+    // Se selecionou 'manual', zera o XP (conforme sua solicitação)
+    const newXp = (playerId === 'manual') ? '0' : top8Data[pos].xp;
+    setTop8Data(prev => ({ ...prev, [pos]: { id: playerId, xp: newXp } }));
   };
   const handleTop8XpChange = (pos, xp) => {
-    setTop8Data(prev => ({ ...prev, [pos]: { ...prev[pos], xp: xp } })); // Manter como string temporariamente
+    setTop8Data(prev => ({ ...prev, [pos]: { ...prev[pos], xp: xp } }));
   };
+  const handleManualCustomNameChange = (pos, name) => {
+    setManualCustomNames(prev => ({ ...prev, [pos]: name }));
+  };
+  // --- FIM DOS HANDLERS ---
   
   const handleParticipationSelect = (player) => {
     setParticipationPlayers(prev => [...prev, player]);
@@ -2140,23 +2871,27 @@ function FinalizeChampionshipFormCustom() {
     if (!selectedChamp) { setMessage('Erro: Selecione um campeonato.'); return; }
     setLoading(true); setMessage('');
     
-    // Formata os dados para o backend
+    // --- LÓGICA DO SUBMIT ATUALIZADA ---
     const top8DataFormatted = Object.entries(top8Data)
-      .filter(([pos, data]) => data.id && Number(data.xp) > 0) // Filtra quem tem ID e XP
-      .map(([pos, data]) => ({ 
-        jogadorId: data.id, 
-        posicao: parseInt(pos, 10),
-        xpGanho: Number(data.xp) // Converte XP para número
-      }));
+      .map(([pos, data]) => {
+        const posicao = parseInt(pos, 10);
+        // Se for manual
+        if (data.id === 'manual') {
+          return { jogadorId: null, nomeManual: manualCustomNames[pos], posicao: posicao, xpGanho: 0 };
+        }
+        // Se for jogador registrado
+        if (data.id && Number(data.xp) > 0) {
+          return { jogadorId: data.id, nomeManual: null, posicao: posicao, xpGanho: Number(data.xp) };
+        }
+        return null; // Ignora se não tiver ID ou XP
+      })
+      .filter(Boolean); // Limpa os nulos
+    // --- FIM DA LÓGICA ---
       
-    const participationDataFormatted = {
-      jogadorIds: participationPlayers.map(p => p.id),
-      xpGanho: Number(participationXp)
-    };
-    
+    const participationDataFormatted = { jogadorIds: participationPlayers.map(p => p.id), xpGanho: Number(participationXp) };
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`http://localhost:3001/api/admin/championships/${selectedChamp}/finalize-custom`, { // <-- NOVA ROTA
+      const res = await fetch(`http://localhost:3001/api/admin/championships/${selectedChamp}/finalize-custom`, { 
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
         body: JSON.stringify({ top8: top8DataFormatted, participation: participationDataFormatted })
@@ -2164,10 +2899,15 @@ function FinalizeChampionshipFormCustom() {
       const resData = await res.json();
       if (!res.ok) throw new Error(resData.error || 'Erro ao registrar resultado');
       setMessage(resData.message); 
-      // Limpa o formulário
       setTop8Data({ 1: { id: '', xp: '' }, 2: { id: '', xp: '' }, 3: { id: '', xp: '' }, 4: { id: '', xp: '' }, 5: { id: '', xp: '' }, 6: { id: '', xp: '' }, 7: { id: '', xp: '' }, 8: { id: '', xp: '' } });
+      setManualCustomNames({ 1: '', 2: '', 3: '', 4: '', 5: '', 6: '', 7: '', 8: '' });
       setParticipationPlayers([]);
       setParticipationXp(10);
+      
+      const newList = championships.filter(c => c.id !== selectedChamp);
+      setChampionships(newList);
+      setSelectedChamp(newList.length > 0 ? newList[0].id : '');
+      
     } catch (err) {
       setMessage(`Erro: ${err.message}`);
     }
@@ -2181,17 +2921,13 @@ function FinalizeChampionshipFormCustom() {
   return (
     <form onSubmit={handleSubmit} className="bg-gray-700 p-6 rounded-xl shadow-2xl">
       <h2 className="text-2xl font-semibold text-white mb-6">Lançamento Customizado (XP Manual)</h2>
-      
-      <Select 
-        label="Selecione o Campeonato" 
-        value={selectedChamp} 
-        onChange={e => setSelectedChamp(e.target.value)} 
-        required
-      >
+      {message && (
+        <p className={`text-center mb-4 ${message.startsWith('Erro') ? 'text-red-400' : 'text-teal-300'}`}>{message}</p>
+      )}
+      <Select label="Selecione o Campeonato (Abertos)" value={selectedChamp} onChange={e => setSelectedChamp(e.target.value)} required>
         {championships.length === 0 ? (
-          <option>Nenhum campeonato encontrado</option>
+          <option>Nenhum campeonato aberto encontrado</option>
         ) : (
-          // O Admin Global verá o nome da Org entre parênteses
           championships.map(champ => (
             <option key={champ.id} value={champ.id}>
               {champ.nome} {userData.tipo === 'admin' ? `(${champ.organizadorNome})` : ''}
@@ -2199,59 +2935,53 @@ function FinalizeChampionshipFormCustom() {
           ))
         )}
       </Select>
-      
       <hr className="border-gray-600 my-6" />
       <h3 className="text-lg font-semibold text-gray-200 mb-4">Vencedores (Top 8)</h3>
-      
-      {[1, 2, 3, 4, 5, 6, 7, 8].map(pos => (
-        // Um grupo de (Posição + Seletor de Jogador + Input de XP)
-        <div key={pos} className="grid grid-cols-6 gap-2 items-end mb-2">
-          <span className="col-span-1 text-gray-300 font-bold self-center mb-4">{pos}º:</span>
-          <div className="col-span-3">
-            <Select 
-              label={pos === 1 ? "Jogador" : ""} // Label só no primeiro
-              value={top8Data[pos].id} 
-              onChange={e => handleTop8PlayerChange(pos, e.target.value)} 
-            >
-              <option value="">-- Selecione Jogador --</option>
-              {allPlayers.map(player => ( <option key={player.id} value={player.id}>{player.nome}</option> ))}
-            </Select>
+      {[1, 2, 3, 4, 5, 6, 7, 8].map(pos => {
+        // Verifica se a opção manual está selecionada para esta posição
+        const isManual = top8Data[pos].id === 'manual';
+        
+        return (
+          <div key={pos} className="grid grid-cols-6 gap-2 items-end mb-2">
+            <span className="col-span-1 text-gray-300 font-bold self-center mb-4">{pos}º:</span>
+            <div className="col-span-3">
+              <Select label={pos === 1 ? "Jogador" : ""} value={top8Data[pos].id} onChange={e => handleTop8PlayerChange(pos, e.target.value)} >
+                <option value="">-- Selecione Jogador --</option>
+                <option value="manual">-- Inserir Manualmente --</option>
+                {allPlayers.map(player => ( <option key={player.id} value={player.id}>{player.nome}</option> ))}
+              </Select>
+            </div>
+            <div className="col-span-2">
+               <Input 
+                 label={pos === 1 ? "XP Manual" : ""} 
+                 type="number" 
+                 value={top8Data[pos].xp} 
+                 onChange={e => handleTop8XpChange(pos, e.target.value)} 
+                 placeholder="XP" 
+                 min="0"
+                 disabled={isManual} // <-- DESABILITA SE FOR MANUAL
+                 title={isManual ? "XP não pode ser dado a jogadores não cadastrados" : ""}
+               />
+            </div>
+            {/* Input de Nome Manual (só aparece se 'manual' for selecionado) */}
+            {isManual && (
+              <div className="col-start-2 col-span-5">
+                <Input 
+                  type="text"
+                  placeholder="Nome do Jogador não cadastrado"
+                  value={manualCustomNames[pos]}
+                  onChange={e => handleManualCustomNameChange(pos, e.target.value)}
+                  className="mt-2"
+                />
+              </div>
+            )}
           </div>
-          <div className="col-span-2">
-             <Input 
-               label={pos === 1 ? "XP Manual" : ""} // Label só no primeiro
-               type="number" 
-               value={top8Data[pos].xp} 
-               onChange={e => handleTop8XpChange(pos, e.target.value)} 
-               placeholder="XP" 
-               min="0"
-             />
-          </div>
-        </div>
-      ))}
-      
+        )
+      })}
       <hr className="border-gray-600 my-6" />
       <h3 className="text-lg font-semibold text-gray-200 mb-4">Participação (9º+)</h3>
-      
-      <Input 
-        label="XP Manual para TODOS 9º+" 
-        type="number" 
-        value={participationXp} 
-        onChange={e => setParticipationXp(e.target.value)} 
-        min="0" 
-      />
-      
-      <PlayerMultiSelect
-        label="Adicionar Jogadores (9º+)"
-        players={allPlayers}
-        selectedPlayers={participationPlayers}
-        onSelect={handleParticipationSelect}
-        onDeselect={handleParticipationDeselect}
-      />
-      
-      {message && (
-        <p className={`text-center my-4 ${message.startsWith('Erro') ? 'text-red-400' : 'text-teal-300'}`}>{message}</p>
-      )}
+      <Input label="XP Manual para TODOS 9º+" type="number" value={participationXp} onChange={e => setParticipationXp(e.target.value)} min="0" />
+      <PlayerMultiSelect label="Adicionar Jogadores (9º+)" players={allPlayers} selectedPlayers={participationPlayers} onSelect={handleParticipationSelect} onDeselect={handleParticipationDeselect} />
       
       <Button primary type="submit" disabled={loading || allPlayers.length === 0 || championships.length === 0}>
         {loading ? 'Finalizando...' : 'Finalizar Lançamento Customizado'}

@@ -193,8 +193,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-brand-dark text-brand-light font-sans relative">
-      {/*<LeftSponsorBanner />
-      <RightSponsorBanner />*/}
+      <BottomSponsorBanner />
       <Navbar setPage={setPage} />
       <main className="container mx-auto p-4 md:p-8 px-28 lg:px-48">
         {renderPage()}
@@ -213,7 +212,6 @@ export default function App() {
 }
 
 // --- COMPONENTES DE UI GENÉRICOS ---
-
 // --- Navbar ---
 function Navbar({ setPage }) {
   const { user, userData } = useAuth();
@@ -557,71 +555,12 @@ function CostsCard({ onOpenModal }) {
 }
 
 //Patrocinadores
-// Banner da Esquerda (Fixo)
-/*
-function LeftSponsorBanner() {
-  return (
-    <div className="fixed left-4 top-60 z-40">
-      <a href="#" target="_blank" rel="noopener noreferrer">
-        <img 
-          src="/assets/patrocinador1.jpg"
-          alt="Patrocinador 1" 
-          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
-        />
-      </a>      
-      <a href="#" target="_blank" rel="noopener noreferrer" className="mt-6 block">
-        <img 
-          src="/assets/patrocinador2.jpg" 
-          alt="Patrocinador 2" 
-          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
-        />
-      </a>
-      <a href="#" target="_blank" rel="noopener noreferrer" className="mt-6 block">
-        <img 
-          src="/assets/patrocinador3.jpg" 
-          alt="Patrocinador 3" 
-          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
-        />
-      </a>
-    </div>
-  );
-}
-
-// Banner da Direita (Fixo)
-function RightSponsorBanner() {
-  return (
-    <div className="fixed right-4 top-60 z-40">
-      <a href="#" target="_blank" rel="noopener noreferrer">
-        <img 
-          src="/assets/patrocinador3.jpg" // Caminho do Asset
-          alt="Patrocinador 3" 
-          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
-        />
-      </a>      
-      <a href="#" target="_blank" rel="noopener noreferrer" className="mt-6 block">
-        <img 
-          src="/assets/patrocinador4.jpg" 
-          alt="Patrocinador 4"
-          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
-        />
-      </a>
-      <a href="#" target="_blank" rel="noopener noreferrer" className="mt-6 block">
-        <img 
-          src="/assets/patrocinador4.jpg" 
-          alt="Patrocinador 4"
-          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
-        />
-      </a>
-    </div>
-  );
-}
-*/
 function BottomSponsorBanner() {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex justify-around gap-6 py-4">
       <a href="#" target="_blank" rel="noopener noreferrer">
         <img 
-          src="/assets/patrocinador3.jpg"
+          src="/assets/patrocinador1.jpg"
           alt="Patrocinador 3"
           className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
         />
@@ -629,7 +568,7 @@ function BottomSponsorBanner() {
 
       <a href="#" target="_blank" rel="noopener noreferrer">
         <img 
-          src="/assets/patrocinador4.jpg" 
+          src="/assets/patrocinador1.jpg" 
           alt="Patrocinador 4"
           className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
         />
@@ -637,46 +576,18 @@ function BottomSponsorBanner() {
 
       <a href="#" target="_blank" rel="noopener noreferrer">
         <img 
-          src="/assets/patrocinador4.jpg" 
+          src="/assets/patrocinador1.jpg" 
           alt="Patrocinador 5"
           className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
         />
       </a>
       <a href="#" target="_blank" rel="noopener noreferrer">
         <img 
-          src="/assets/patrocinador4.jpg" 
+          src="/assets/patrocinador1.jpg" 
           alt="Patrocinador 5"
           className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
         />
       </a>
-    </div>
-  );
-}
-
-// Banners da Rifa (Em linha, no final da página)
-function RifaSponsorBanners() {
-  return (
-    <div className="mt-12 pt-8 border-t border-gray-700">
-      <h3 className="text-xl font-semibold text-center text-gray-400 mb-6">Nossos Patrocinadores</h3>
-      {/* Ajuste 'justify-center' para 'justify-between' se preferir */}
-      <div className="flex flex-wrap justify-center lg:justify-around items-center gap-6">
-        
-        <a href="#" target="_blank" rel="noopener noreferrer" title="Patrocinador 1">
-          <img src="/assets/patrocinador1.jpg" alt="Patrocinador Rifa 1" className="h-16 lg:h-20 w-auto object-contain"/>
-        </a>
-        <a href="#" target="_blank" rel="noopener noreferrer" title="Patrocinador 2">
-          <img src="/assets/patrocinador1.jpg" alt="Patrocinador Rifa 2" className="h-16 lg:h-20 w-auto object-contain"/>
-        </a>
-        <a href="#" target="_blank" rel="noopener noreferrer" title="Patrocinador 3">
-          <img src="/assets/patrocinador1.jpg" alt="Patrocinador Rifa 3" className="h-16 lg:h-20 w-auto object-contain"/>
-        </a>
-        <a href="#" target="_blank" rel="noopener noreferrer" title="Patrocinador 4">
-          <img src="/assets/patrocinador1.jpg" alt="Patrocinador Rifa 4" className="h-16 lg:h-20 w-auto object-contain"/>
-        </a>
-        <a href="#" target="_blank" rel="noopener noreferrer" title="Patrocinador 4">
-          <img src="/assets/patrocinador1.jpg" alt="Patrocinador Rifa 4" className="h-16 lg:h-20 w-auto object-contain"/>
-        </a>   
-      </div>
     </div>
   );
 }
@@ -1222,13 +1133,9 @@ function RifaPage() {
                 Resetar Rifa (Limpar Cotas)
               </Button>
             </div>
-          )}
-          
-        </div>
-      
+          )}          
+        </div>      
       </div>
-      
-      <RifaSponsorBanners />
     </div>
   );
 }

@@ -193,8 +193,8 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-brand-dark text-brand-light font-sans relative">
-      <LeftSponsorBanner />
-      <RightSponsorBanner />
+      {/*<LeftSponsorBanner />
+      <RightSponsorBanner />*/}
       <Navbar setPage={setPage} />
       <main className="container mx-auto p-4 md:p-8 px-28 lg:px-48">
         {renderPage()}

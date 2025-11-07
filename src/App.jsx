@@ -558,6 +558,7 @@ function CostsCard({ onOpenModal }) {
 
 //Patrocinadores
 // Banner da Esquerda (Fixo)
+/*
 function LeftSponsorBanner() {
   return (
     <div className="fixed left-4 top-60 z-40">
@@ -614,7 +615,7 @@ function RightSponsorBanner() {
     </div>
   );
 }
-
+*/
 function BottomSponsorBanner() {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex justify-around gap-6 py-4">

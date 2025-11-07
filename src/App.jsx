@@ -5,8 +5,11 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
+  updateProfile,
+  updatePassword
 } from 'firebase/auth';
+
 import {
   getFirestore,
   doc,
@@ -31,7 +34,7 @@ const GAME_MAP = {
   },
   'mk1': {
     name: 'Mortal Kombat 1',
-    icon: '/assets/icones-jogos/mk1.jpeg'
+    icon: '/assets/icones-jogos/mk1.png'
   },
   'tekken8': {
     name: 'Tekken 8',
@@ -53,6 +56,15 @@ const GAME_MAP = {
     name: 'The King Of Fighters 15',
     icon: '/assets/icones-jogos/kof15.jpeg'
   },
+};
+
+// Content da rifa
+const STATIC_RIFA_DATA = {
+  titulo: "Rifa Especial da Comunidade",
+  descricao: "Concorra a um Controle Arcade exclusivo! Cada cota ajuda a financiar o próximo torneio.",
+  imagemUrl: "./public/assets/rifa/novembro-arcade.jpg",
+  qrCodeUrl: "./public/assets/rifa/novembro-qrCode.png",
+  pagamentoDesc: "Valor: R$ 5,00 por cota.\nChave PIX (Email): fgcbrasil@pix.com\n\nEnvie o comprovante para o Admin."
 };
 
 // --- ARQUIVO: firebase.js (EMBUTIDO) ---
@@ -154,14 +166,14 @@ function AppContent() {
         case 'rifa': 
           return <RifaPage setPage={setPage} />;
           
-        // --- ROTA DE PERFIL ADICIONADA ---
+        // --- MUDANÇA AQUI ---
         case 'profile':
-          // Jogadores e Fãs podem editar o perfil
-          if (userData.tipo === 'jogador' || userData.tipo === 'fã') {
+          // Agora, Jogadores, Fãs E Organizadores podem editar o perfil
+          if (userData.tipo === 'jogador' || userData.tipo === 'fã' || userData.tipo === 'organizador') {
             return <ProfilePage setPage={setPage} />;
           }
-          // Admins e Orgs são redirecionados
           return <DashboardPage setPage={setPage} />;
+        // --- FIM DA MUDANÇA ---
         
         case 'admin':
           if (userData.admin === true && userData.tipo === 'admin') { 
@@ -205,12 +217,11 @@ export default function App() {
 // --- Navbar ---
 function Navbar({ setPage }) {
   const { user, userData } = useAuth();
-  
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await signOut(auth);
-    setIsMobileMenuOpen(false); // Fecha o menu ao sair
+    setIsMobileMenuOpen(false); 
     setPage('login');
   };
   
@@ -231,7 +242,11 @@ function Navbar({ setPage }) {
       );
     }
     
-    const hasProfilePage = userData.tipo === 'jogador' || userData.tipo === 'fã';
+    // --- MUDANÇA AQUI ---
+    // 'organizador' agora está incluído no hasProfilePage
+    const hasProfilePage = userData.tipo === 'jogador' || userData.tipo === 'fã' || userData.tipo === 'organizador';
+    // --- FIM DA MUDANÇA ---
+    
     const profileImage = userData.profileImageUrl || 'https://placehold.co/40x40/6f42c1/ffffff?text=U';
 
     if (userData.admin === true && userData.tipo === 'admin') {
@@ -249,6 +264,7 @@ function Navbar({ setPage }) {
       );
     }
     
+    // Se for Jogador OU Organizador
     if (userData.tipo === 'jogador' || userData.tipo === 'organizador') {
        return (
         <>
@@ -256,6 +272,11 @@ function Navbar({ setPage }) {
           <LinkComponent onClick={clickHandler('championships')}>Organizações</LinkComponent>
           <LinkComponent onClick={clickHandler('ranking')}>Ranking</LinkComponent>
           <LinkComponent onClick={clickHandler('rifa')}>Rifa</LinkComponent>
+          
+          {/* --- MUDANÇA AQUI ---
+            Agora, tanto Jogador quanto Organizador verão a imagem
+            pois hasProfilePage é true para ambos.
+          --- FIM DA MUDANÇA --- */}
           {hasProfilePage && (
              <img 
                src={profileImage} 
@@ -264,12 +285,12 @@ function Navbar({ setPage }) {
                onClick={clickHandler('profile')}
              />
           )}
-          {/* --- BOTÃO "SAIR" ADICIONADO DE VOLTA --- */}
           <Button onClick={handleLogout}>Sair</Button>
         </>
       );
     }
     
+    // Se for Fã
     if (userData.tipo === 'fã') {
        return (
         <>
@@ -285,7 +306,6 @@ function Navbar({ setPage }) {
             className="w-10 h-10 rounded-full cursor-pointer object-cover" 
             onClick={clickHandler('profile')}
           />
-          {/* --- BOTÃO "SAIR" ADICIONADO DE VOLTA --- */}
           <Button onClick={handleLogout}>Sair</Button>
         </>
       );
@@ -295,6 +315,7 @@ function Navbar({ setPage }) {
   };
 
   return (
+    // ... (o resto do Navbar continua o mesmo) ...
     <nav className="bg-gray-800 shadow-lg sticky top-0 z-50 relative">
       <div className="container mx-auto px-4 md:px-8">
         <div className="flex justify-between items-center h-20">
@@ -538,28 +559,27 @@ function CostsCard({ onOpenModal }) {
 //Patrocinadores
 // Banner da Esquerda (Fixo)
 function LeftSponsorBanner() {
-  // Nota: 'hidden lg:block' esconde o banner em telas pequenas/médias
   return (
     <div className="fixed left-4 top-60 z-40">
       <a href="#" target="_blank" rel="noopener noreferrer">
         <img 
-          src="/assets/patrocinador1.jpg" // Caminho do Asset
+          src="/assets/patrocinador1.jpg"
           alt="Patrocinador 1" 
-          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg" 
+          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
         />
       </a>      
       <a href="#" target="_blank" rel="noopener noreferrer" className="mt-6 block">
         <img 
           src="/assets/patrocinador2.jpg" 
           alt="Patrocinador 2" 
-          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg" 
+          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
         />
       </a>
       <a href="#" target="_blank" rel="noopener noreferrer" className="mt-6 block">
         <img 
           src="/assets/patrocinador3.jpg" 
           alt="Patrocinador 3" 
-          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg" 
+          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
         />
       </a>
     </div>
@@ -574,21 +594,58 @@ function RightSponsorBanner() {
         <img 
           src="/assets/patrocinador3.jpg" // Caminho do Asset
           alt="Patrocinador 3" 
-          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg" 
+          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
         />
       </a>      
       <a href="#" target="_blank" rel="noopener noreferrer" className="mt-6 block">
         <img 
           src="/assets/patrocinador4.jpg" 
           alt="Patrocinador 4"
-          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg" 
+          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
         />
       </a>
       <a href="#" target="_blank" rel="noopener noreferrer" className="mt-6 block">
         <img 
           src="/assets/patrocinador4.jpg" 
           alt="Patrocinador 4"
-          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg" 
+          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
+        />
+      </a>
+    </div>
+  );
+}
+
+function BottomSponsorBanner() {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 flex justify-around gap-6 py-4">
+      <a href="#" target="_blank" rel="noopener noreferrer">
+        <img 
+          src="/assets/patrocinador3.jpg"
+          alt="Patrocinador 3"
+          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
+        />
+      </a>
+
+      <a href="#" target="_blank" rel="noopener noreferrer">
+        <img 
+          src="/assets/patrocinador4.jpg" 
+          alt="Patrocinador 4"
+          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
+        />
+      </a>
+
+      <a href="#" target="_blank" rel="noopener noreferrer">
+        <img 
+          src="/assets/patrocinador4.jpg" 
+          alt="Patrocinador 5"
+          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
+        />
+      </a>
+      <a href="#" target="_blank" rel="noopener noreferrer">
+        <img 
+          src="/assets/patrocinador4.jpg" 
+          alt="Patrocinador 5"
+          className="w-24 lg:w-40 h-auto object-contain rounded-lg shadow-lg transition-transform hover:scale-105" 
         />
       </a>
     </div>
@@ -705,40 +762,105 @@ function LoginPage({ setPage }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nome, setNome] = useState('');
-  const [tipo, setTipo] = useState('jogador'); // <-- Valor padrão
+  const [tipo, setTipo] = useState('jogador'); 
   const [error, setError] = useState('');
+  
+  // --- NOVOS ESTADOS PARA O REGISTRO ---
+  const [teamName, setTeamName] = useState('');
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false); // Loading geral
+  // --- FIM DOS NOVOS ESTADOS ---
+  
+  // Credenciais do Cloudinary (necessárias para o upload)
+  const CLOUDINARY_CLOUD_NAME = "dy0hmkgry"; 
+  const CLOUDINARY_UPLOAD_PRESET = "br5z3gyj";
+
+  // Gera a prévia da imagem
+  useEffect(() => {
+    if (!file) {
+      setPreview(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }, [file]);
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
+
     if (isLogin) {
+      // --- Login ---
       try {
         await signInWithEmailAndPassword(auth, email, password);
-        setPage('dashboard');
+        setPage('dashboard'); 
       } catch (err) {
         setError(getFriendlyAuthError(err.code));
       }
+      setLoading(false); // Para o loading do login
     } else {
+      // --- Registro (LÓGICA ATUALIZADA) ---
       if (!nome) {
         setError("Por favor, informe seu nome ou nick.");
+        setLoading(false);
         return;
       }
+      
+      let profileImageUrl = '';
+      
       try {
+        // 1. Se um arquivo foi selecionado, faça o upload PRIMEIRO
+        if (file) {
+          if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+            throw new Error("Cloudinary não está configurado no frontend.");
+          }
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+          
+          const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+            method: 'POST',
+            body: formData
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error.message || 'Falha no upload do Cloudinary');
+          profileImageUrl = data.secure_url; // Pega a nova URL
+        }
+
+        // 2. Crie o usuário no Firebase Auth
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
+        
+        // 3. Atualize o displayName (nome) e photoURL no Auth
+        await updateProfile(user, { 
+          displayName: nome,
+          photoURL: profileImageUrl 
+        });
 
-        // A rota /api/users/register agora lida com a criação da organização
+        // 4. Envie TUDO para o seu backend para criar o documento no Firestore
         await fetch(`${API_BASE_URL}/api/users/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            uid: user.uid, email: user.email, nome: nome, tipo: tipo
+            uid: user.uid, 
+            email: user.email, 
+            nome: nome, 
+            tipo: tipo,
+            profileImageUrl: profileImageUrl, // Envia a URL
+            teamName: tipo === 'jogador' ? teamName : '' // Envia o time (se for jogador)
           })
         });
-        setPage('dashboard');
+        
+        setPage('dashboard'); 
       } catch (err) {
-        setError(getFriendlyAuthError(err.code));
+        setError(getFriendlyAuthError(err.code) || err.message);
       }
+      setLoading(false); // Para o loading do registro
     }
   };
 
@@ -750,22 +872,54 @@ function LoginPage({ setPage }) {
       <form onSubmit={handleAuth}>
         {!isLogin && (
           <>
-            <Input label="Nome / Nick" type="text" value={nome} onChange={(e) => setNome(e.target.value)} />
+            {/* --- NOVO: Input de Foto --- */}
+            <div className="flex flex-col items-center mb-4">
+              <img 
+                src={preview || 'https://placehold.co/100x100/1a202c/6f42c1?text=Foto'} 
+                alt="Prévia" 
+                className="w-24 h-24 rounded-full object-cover border-4 border-gray-700"
+              />
+              <Input 
+                label="Foto de Perfil (Opcional)"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setFile(e.target.files[0])}
+                className="file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
+              />
+            </div>
+            {/* --- FIM --- */}
+          
+            <Input label="Nome / Nick" type="text" value={nome} onChange={(e) => setNome(e.target.value)} required />
+            
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-300 mb-2">Eu sou:</label>
               <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
                 <option value="jogador">Jogador</option>
                 <option value="fã">Fã / Espectador</option>
-                <option value="organizador">Organizador</option> {/* <-- OPÇÃO ADICIONADA */}
+                <option value="organizador">Organizador</option> 
               </select>
             </div>
+            
+            {/* --- NOVO: Input de Time (Condicional) --- */}
+            {tipo === 'jogador' && (
+              <Input 
+                label="Nome da Equipe (Opcional)" 
+                type="text" 
+                value={teamName} 
+                onChange={e => setTeamName(e.target.value)} 
+                placeholder="Ex: LOUD, Furia"
+              />
+            )}
+            {/* --- FIM --- */}
           </>
         )}
-        <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <Input label="Senha" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <Input label="Senha" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        
         {error && <p className="text-red-400 text-sm text-center mb-4">{error}</p>}
-        <button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition duration-300 shadow-lg">
-          {isLogin ? 'Login' : 'Registrar'}
+        
+        <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition duration-300 shadow-lg disabled:opacity-50">
+          {loading ? 'Processando...' : (isLogin ? 'Login' : 'Registrar')}
         </button>
       </form>
       <button onClick={() => setIsLogin(!isLogin)} className="w-full mt-4 text-sm text-center text-gray-400 hover:text-white transition">
@@ -909,23 +1063,37 @@ function AdminRifaForm({ onParticipanteAdded, allUsers }) { // Recebe allUsers
 // Página da Rifa
 function RifaPage() {
   const { user, userData } = useAuth();
-  const [rifa, setRifa] = useState(null);
+  
+  // O estado 'rifa' agora começa com os dados estáticos
+  const [rifa, setRifa] = useState(STATIC_RIFA_DATA); 
+  
+  // Novo estado apenas para os participantes
+  const [participantes, setParticipantes] = useState([]);
+  
   const [allUsers, setAllUsers] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const isAdmin = userData?.admin === true && userData?.tipo === 'admin';
 
-  const fetchRifa = async () => {
+  // Função para buscar APENAS os participantes da rifa
+  const fetchRifaParticipantes = async () => {
     setError('');
     try {
       const res = await fetch(`${API_BASE_URL}/api/rifa/atual`);
       const data = await res.json();
       if (res.ok) {
-        if (data.participantes) data.participantes.sort((a, b) => a.numero - b.numero);
-        setRifa(data);
+        if (data.participantes) {
+          data.participantes.sort((a, b) => a.numero - b.numero);
+          setParticipantes(data.participantes);
+        } else {
+          setParticipantes([]);
+        }
       } else {
-        throw new Error(data.error || 'Erro ao buscar rifa');
+        // Se o doc 'atual' não existir no Firestore, não é um erro fatal.
+        // Apenas significa que não há participantes.
+        console.warn(data.error || 'Documento da rifa "atual" não encontrado. Criando um novo automaticamente na próxima adição de cota.');
+        setParticipantes([]);
       }
     } catch (err) {
       setError(err.message);
@@ -933,8 +1101,10 @@ function RifaPage() {
     setLoading(false);
   };
 
+  // Busca os dados (participantes e lista de usuários)
   useEffect(() => {
-    fetchRifa();
+    fetchRifaParticipantes(); // Busca participantes
+    
     if (isAdmin) {
       const fetchAllUsers = async () => {
         try {
@@ -952,6 +1122,7 @@ function RifaPage() {
     }
   }, [isAdmin, user]); 
 
+  // Handler para o botão de reset (continua igual)
   const handleResetRifa = async () => {
     if (!window.confirm("Você tem CERTEZA que quer apagar TODAS as cotas desta rifa? Esta ação é irreversível.")) {
       return;
@@ -966,35 +1137,17 @@ function RifaPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao resetar');
       alert(data.message);
-      fetchRifa(); 
+      fetchRifaParticipantes(); // Recarrega os participantes
     } catch (err) {
       alert(`Erro: ${err.message}`);
     }
     setLoading(false);
   };
 
-  if (loading) return <LoadingSpinner text="Carregando Rifa..." />;
+  // O loading agora é só para o fetch de participantes
+  if (loading && isAdmin) return <LoadingSpinner text="Carregando Rifa..." />;
   
-  if (error || !rifa) {
-    return (
-      <div className="animate-fade-in max-w-2xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8 text-center">Página da Rifa</h1>
-        <div className="bg-gray-800 p-10 rounded-xl shadow-lg text-center">
-          <h3 className="text-2xl font-semibold text-white mb-4">Nenhuma Rifa Ativa</h3>
-          <p className="text-gray-300">{error || "Não há nenhuma rifa ativa no momento. Volte mais tarde!"}</p>
-          {isAdmin && (
-            <p className="text-teal-300 mt-4 italic">
-              Admin: Para ativar a rifa, crie um documento com o ID "atual" na coleção "rifas" do Firestore.
-            </p>
-          )}
-        </div>
-        
-        {/* Adiciona o banner da rifa mesmo se ela não for encontrada */}
-        <RifaSponsorBanners />
-        
-      </div>
-    );
-  }
+  // (Removemos o 'error || !rifa' porque a rifa agora é estática)
   
   return (
     <div className="animate-fade-in">
@@ -1002,7 +1155,7 @@ function RifaPage() {
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Coluna Esquerda: Detalhes e Pagamento */}
+        {/* Coluna Esquerda: Detalhes e Pagamento (usando 'rifa' estática) */}
         <div className="lg:col-span-2 space-y-8">
            <div className="bg-gray-800 rounded-xl shadow-lg overflow-hidden">
             <img 
@@ -1036,17 +1189,18 @@ function RifaPage() {
           
           {isAdmin && (
             <AdminRifaForm 
-              onParticipanteAdded={fetchRifa} 
+              onParticipanteAdded={fetchRifaParticipantes} // Atualiza a lista
               allUsers={allUsers} 
             />
           )}
           
+          {/* Lista de Cotas (usando 'participantes' do estado) */}
           <div className="max-h-96 lg:max-h-[600px] overflow-y-auto mt-4 border border-gray-700 rounded-lg flex-grow">
-            {rifa.participantes.length === 0 && (
+            {participantes.length === 0 && (
               <p className="text-gray-400 p-4 text-center italic">Nenhuma cota comprada ainda. Seja o primeiro!</p>
             )}
             <ul className="divide-y divide-gray-700">
-              {rifa.participantes.map(p => (
+              {participantes.map(p => (
                 <li key={`${p.numero}-${p.nome}`} className="flex justify-between items-center p-3">
                   <span className="text-sm font-medium text-gray-400 bg-gray-900 px-2 py-0.5 rounded-md">
                     Nº {p.numero}
@@ -1073,9 +1227,7 @@ function RifaPage() {
       
       </div>
       
-      {/* --- BANNER ADICIONADO AO FINAL --- */}
       <RifaSponsorBanners />
-      
     </div>
   );
 }
@@ -1358,21 +1510,91 @@ function DashboardPage({ setPage }) {
 }
 
 // --- PÁGINA PROFILE ---
-function ProfilePage() {
-  const { user, userData } = useAuth();
-  
-  // --- !! PREENCHA COM SEUS DADOS DO CLOUDINARY !! ---
-  const CLOUDINARY_CLOUD_NAME = "dy0hmkgry"; 
-  const CLOUDINARY_UPLOAD_PRESET = "br5z3gyj";
-  // ---
-  
-  const [teamName, setTeamName] = useState(userData.teamName || '');
-  const [file, setFile] = useState(null); // O arquivo selecionado
-  const [preview, setPreview] = useState(userData.profileImageUrl); // A prévia da imagem
+// --- (SUBSTITUA A FUNÇÃO ProfilePage E ADICIONE SEUS FILHOS) ---
+
+// NOVO Componente Filho (Formulário de Senha)
+function PasswordUpdateForm() {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  const handlePasswordUpdate = async (e) => {
+    e.preventDefault();
+    setMessage('');
+    
+    if (newPassword !== confirmPassword) {
+      setMessage('Erro: As senhas não conferem.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setMessage('Erro: A senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const user = auth.currentUser;
+      await updatePassword(user, newPassword);
+      
+      setMessage('Senha alterada com sucesso!');
+      setNewPassword('');
+      setConfirmPassword('');
+      
+    } catch (err) {
+      // Erro comum se o login não for recente
+      if (err.code === 'auth/requires-recent-login') {
+        setMessage('Erro: Esta operação é sensível. Por favor, faça login novamente e tente de novo.');
+      } else {
+        setMessage(`Erro: ${err.message}`);
+      }
+    }
+    setLoading(false);
+  };
+
+  return (
+    <form onSubmit={handlePasswordUpdate} className="bg-gray-800 p-6 rounded-xl shadow-2xl">
+      <h2 className="text-2xl font-semibold text-white mb-6">Alterar Senha</h2>
+      {message && (
+        <p className={`text-center mb-4 text-sm ${message.startsWith('Erro') ? 'text-red-400' : 'text-teal-300'}`}>{message}</p>
+      )}
+      <Input 
+        label="Nova Senha" 
+        type="password" 
+        value={newPassword}
+        onChange={e => setNewPassword(e.target.value)}
+        required
+      />
+      <Input 
+        label="Repetir Nova Senha" 
+        type="password" 
+        value={confirmPassword}
+        onChange={e => setConfirmPassword(e.target.value)}
+        required
+      />
+      <Button primary type="submit" disabled={loading}>
+        {loading ? 'Salvando...' : 'Salvar Nova Senha'}
+      </Button>
+    </form>
+  );
+}
+
+// Componente Filho Atualizado (Formulário de Perfil)
+function ProfileUpdateForm() {
+  const { user, userData } = useAuth();
   
-  // Cria a prévia da imagem quando um arquivo é selecionado
+  const CLOUDINARY_CLOUD_NAME = "dy0hmkgry"; 
+  const CLOUDINARY_UPLOAD_PRESET = "br5z3gyj";
+  
+  // --- ESTADOS ATUALIZADOS ---
+  const [nome, setNome] = useState(userData.nome || ''); // Adicionado Nome
+  const [teamName, setTeamName] = useState(userData.teamName || '');
+  const [file, setFile] = useState(null); 
+  const [preview, setPreview] = useState(userData.profileImageUrl); 
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  // --- FIM ---
+  
   useEffect(() => {
     if (!file) return;
     const reader = new FileReader();
@@ -1387,31 +1609,33 @@ function ProfilePage() {
     setLoading(true);
     setMessage('');
 
+    if (!nome) {
+      setMessage('Erro: O nome não pode ficar em branco.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      let imageUrl = userData.profileImageUrl; // Começa com a imagem antiga
+      let imageUrl = preview; // Começa com a imagem atual (que pode ser a antiga ou a prévia)
 
       // 1. Se um NOVO arquivo foi selecionado, faça o upload para o Cloudinary
       if (file) {
         if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
           throw new Error("Cloudinary não está configurado no frontend.");
         }
-      
         const formData = new FormData();
         formData.append('file', file);
         formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-        
         const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
           method: 'POST',
           body: formData
         });
-        
         const data = await res.json();
         if (!res.ok) throw new Error(data.error.message || 'Falha no upload do Cloudinary');
-        
-        imageUrl = data.secure_url; // Pega a nova URL
+        imageUrl = data.secure_url; 
       }
 
-      // 2. Envie a URL (nova ou antiga) para o SEU backend
+      // 2. Envie os dados (incluindo o nome) para o SEU backend
       const token = await user.getIdToken();
       const resBackend = await fetch(`${API_BASE_URL}/api/users/profile`, {
         method: 'PUT',
@@ -1421,15 +1645,22 @@ function ProfilePage() {
         },
         body: JSON.stringify({
           profileImageUrl: imageUrl,
-          teamName: teamName // Envia o nome da equipe (o backend só salvará se for jogador)
+          teamName: teamName,
+          nome: nome // <-- CAMPO ADICIONADO
         })
       });
 
       const dataBackend = await resBackend.json();
       if (!resBackend.ok) throw new Error(dataBackend.error || 'Falha ao salvar no backend');
       
+      // 3. Atualiza o displayName no Auth do CLIENTE (para o Navbar)
+      await updateProfile(user, {
+        displayName: nome,
+        photoURL: imageUrl
+      });
+      
       setMessage(dataBackend.message);
-      setFile(null); // Limpa o arquivo
+      setFile(null); 
       
     } catch (err) {
       setMessage(`Erro: ${err.message}`);
@@ -1438,44 +1669,66 @@ function ProfilePage() {
   };
 
   return (
+    <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-xl shadow-2xl">
+      <h2 className="text-2xl font-semibold text-white mb-6">Editar Perfil</h2>
+      
+      <div className="flex flex-col items-center mb-6">
+        <img 
+          src={preview || 'https://placehold.co/150x150/1a202c/6f42c1?text=Foto'} 
+          alt="Prévia do Perfil" 
+          className="w-40 h-40 rounded-full object-cover border-4 border-gray-700"
+        />
+        <Input 
+          label="Mudar foto de perfil"
+          type="file"
+          accept="image/*"
+          onChange={(e) => setFile(e.target.files[0])}
+          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
+        />
+      </div>
+
+      {/* --- INPUT DE NOME ADICIONADO --- */}
+      <Input 
+        label="Nome / Nick"
+        type="text"
+        value={nome}
+        onChange={e => setNome(e.target.value)}
+        required
+      />
+
+      {/* Input condicional para Jogadores */}
+      {userData.tipo === 'jogador' && (
+        <Input 
+          label="Nome da Equipe (Opcional)" 
+          type="text" 
+          value={teamName} 
+          onChange={e => setTeamName(e.target.value)} 
+          placeholder="Ex: LOUD, Furia"
+        />
+      )}
+      
+      {message && (
+        <p className={`text-center mb-4 ${message.startsWith('Erro') ? 'text-red-400' : 'text-teal-300'}`}>{message}</p>
+      )}
+      
+      <Button primary type="submit" disabled={loading}>
+        {loading ? 'Salvando...' : 'Salvar Alterações de Perfil'}
+      </Button>
+    </form>
+  );
+}
+
+// Página Principal (Agora é um container para os dois formulários)
+function ProfilePage() {
+  return (
     <div className="animate-fade-in max-w-2xl mx-auto">
       <h1 className="text-4xl font-bold mb-8">Meu Perfil</h1>
-      <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-xl shadow-2xl">
-        
-        <div className="flex flex-col items-center mb-6">
-          <img 
-            src={preview || 'https://placehold.co/150x150/1a202c/6f42c1?text=Foto'} 
-            alt="Prévia do Perfil" 
-            className="w-40 h-40 rounded-full object-cover border-4 border-gray-700"
-          />
-          <Input 
-            label="Mudar foto de perfil"
-            type="file"
-            accept="image/*"
-            onChange={(e) => setFile(e.target.files[0])}
-            className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
-          />
-        </div>
-
-        {/* Input condicional para Jogadores */}
-        {userData.tipo === 'jogador' && (
-          <Input 
-            label="Nome da Equipe (Opcional)" 
-            type="text" 
-            value={teamName} 
-            onChange={e => setTeamName(e.target.value)} 
-            placeholder="Ex: LOUD, Furia"
-          />
-        )}
-        
-        {message && (
-          <p className={`text-center mb-4 ${message.startsWith('Erro') ? 'text-red-400' : 'text-teal-300'}`}>{message}</p>
-        )}
-        
-        <Button primary type="submit" disabled={loading}>
-          {loading ? 'Salvando...' : 'Salvar Alterações'}
-        </Button>
-      </form>
+      
+      {/* Container com espaçamento */}
+      <div className="space-y-8">
+        <ProfileUpdateForm />
+        <PasswordUpdateForm />
+      </div>
     </div>
   );
 }
@@ -1657,7 +1910,6 @@ function RankingPage({ setPage }) {
         } else {
           throw new Error(configData.error || 'Erro ao buscar config');
         }
-        // --- FIM DA MUDANÇA ---
         
       } catch (err) {
         setError(err.message);
@@ -2038,7 +2290,6 @@ function AdminPage() {
             <ManageRankingConfigCard /> {/* <-- CARD ADICIONADO */}
             <ResetRankingCard /> 
           </div>
-          // --- FIM DA MUDANÇA ---
         )}
         
         {activeTab === 'results' && (
@@ -2804,7 +3055,6 @@ function FinalizeChampionshipForm() {
               />
             )}
           </div>
-          // --- FIM DA MUDANÇA ---
         ))}
       </div>
       <hr className="border-gray-600 my-6" />

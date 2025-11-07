@@ -62,8 +62,8 @@ const GAME_MAP = {
 const STATIC_RIFA_DATA = {
   titulo: "Rifa Especial da Comunidade",
   descricao: "Concorra a um Controle Arcade exclusivo! Cada cota ajuda a financiar o próximo torneio.",
-  imagemUrl: "./public/assets/rifa/novembro-arcade.jpg",
-  qrCodeUrl: "./public/assets/rifa/novembro-qrCode.png",
+  imagemUrl: "./assets/rifa/novembro-arcade.jpg",
+  qrCodeUrl: "./assets/rifa/novembro-qrCode.png",
   pagamentoDesc: "Valor: R$ 5,00 por cota.\nChave PIX (Email): fgcbrasil@pix.com\n\nEnvie o comprovante para o Admin."
 };
 

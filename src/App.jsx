@@ -19,6 +19,10 @@ import {
   limit
 } from 'firebase/firestore';
 
+// O Vite (Vercel) usará a VITE_API_URL.
+// Localmente (seu PC), ele usará o 'http://localhost:3001'.
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 // MAPA DE JOGOS
 const GAME_MAP = {
   'sf6': {
@@ -37,7 +41,18 @@ const GAME_MAP = {
     name: 'Guilty Gear -Strive-',
     icon: '/assets/icones-jogos/ggst.jpeg'
   },
-  
+  '2xko': {
+    name: '2xko',
+    icon: '/assets/icones-jogos/2sko.jpeg'
+  },
+  'ff': {
+    name: 'Final Fight City - Of The Wolves',
+    icon: '/assets/icones-jogos/ff.jpeg'
+  },
+  'kof15': {
+    name: 'The King Of Fighters 15',
+    icon: '/assets/icones-jogos/kof15.jpeg'
+  },
 };
 
 // --- ARQUIVO: firebase.js (EMBUTIDO) ---
@@ -713,7 +728,7 @@ function LoginPage({ setPage }) {
         const user = userCredential.user;
 
         // A rota /api/users/register agora lida com a criação da organização
-        await fetch('http://localhost:3001/api/users/register', {
+        await fetch(`${API_BASE_URL}/api/users/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -850,7 +865,7 @@ function AdminRifaForm({ onParticipanteAdded, allUsers }) { // Recebe allUsers
     setMessage('');
     try {
       const token = await user.getIdToken();
-      const res = await fetch('http://localhost:3001/api/rifa/add-participante', {
+      const res = await fetch(`${API_BASE_URL}/api/rifa/add-participante`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
         body: JSON.stringify({ jogadorId: selectedUserId }) // Envia o ID
@@ -904,7 +919,7 @@ function RifaPage() {
   const fetchRifa = async () => {
     setError('');
     try {
-      const res = await fetch('http://localhost:3001/api/rifa/atual');
+      const res = await fetch(`${API_BASE_URL}/api/rifa/atual`);
       const data = await res.json();
       if (res.ok) {
         if (data.participantes) data.participantes.sort((a, b) => a.numero - b.numero);
@@ -924,7 +939,7 @@ function RifaPage() {
       const fetchAllUsers = async () => {
         try {
           const token = await user.getIdToken();
-          const res = await fetch('http://localhost:3001/api/users/all', {
+          const res = await fetch(`${API_BASE_URL}/api/users/all`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const data = await res.json();
@@ -944,7 +959,7 @@ function RifaPage() {
     setLoading(true);
     try {
       const token = await user.getIdToken();
-      const res = await fetch('http://localhost:3001/api/rifa/reset', {
+      const res = await fetch(`${API_BASE_URL}/api/rifa/reset`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -1096,7 +1111,7 @@ function MissionCard({ mission, onComplete }) {
     
     try {
       const token = await user.getIdToken();
-      const res = await fetch('http://localhost:3001/api/missions/complete', {
+      const res = await fetch(`${API_BASE_URL}/api/missions/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
         body: JSON.stringify({ missionId: mission.id })
@@ -1174,7 +1189,7 @@ function MissaoPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('http://localhost:3001/api/missions');
+      const res = await fetch(`${API_BASE_URL}/api/missions`);
       const data = await res.json();
       if (res.ok) {
         setMissions(data);
@@ -1241,7 +1256,7 @@ function DashboardPage({ setPage }) {
   useEffect(() => {
     const fetchTotalContributions = async () => {
       try {
-        const res = await fetch('http://localhost:3001/api/contributions/total');
+        const res = await fetch(`${API_BASE_URL}/api/contributions/total`);
         const data = await res.json();
         if (res.ok) {
           setTotalContributions(data.total);
@@ -1398,7 +1413,7 @@ function ProfilePage() {
 
       // 2. Envie a URL (nova ou antiga) para o SEU backend
       const token = await user.getIdToken();
-      const resBackend = await fetch('http://localhost:3001/api/users/profile', {
+      const resBackend = await fetch(`${API_BASE_URL}/api/users/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1480,7 +1495,7 @@ function ContactAdminCard() {
     
     try {
       const token = await user.getIdToken();
-      const res = await fetch('http://localhost:3001/api/support/send-ticket', {
+      const res = await fetch(`${API_BASE_URL}/api/support/send-ticket`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ subject, message })
@@ -1550,7 +1565,7 @@ function FanDashboard() {
     setLoading(true); setMessage('');
     try {
       const token = await user.getIdToken();
-      const res = await fetch('http://localhost:3001/api/contributions', {
+      const res = await fetch(`${API_BASE_URL}/api/contributions`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
         body: JSON.stringify({ valor: Number(valor) })
@@ -1624,8 +1639,8 @@ function RankingPage({ setPage }) {
       setError('');
       try {
         // --- MUDANÇA: Busca os rankings E a configuração ---
-        const rankingRes = await fetch('http://localhost:3001/api/ranking');
-        const configRes = await fetch('http://localhost:3001/api/config/ranking');
+        const rankingRes = await fetch(`${API_BASE_URL}/api/ranking`);
+        const configRes = await fetch(`${API_BASE_URL}/api/config/ranking`);
         
         const rankingData = await rankingRes.json();
         const configData = await configRes.json();
@@ -1794,7 +1809,7 @@ function ChampionshipsPage({ setPage }) {
       setLoading(true);
       setError('');
       try {
-        const res = await fetch('http://localhost:3001/api/organizacoes');
+        const res = await fetch(`${API_BASE_URL}/api/organizacoes`);
         const data = await res.json();
         if (res.ok) {
           setOrgs(data);
@@ -1885,7 +1900,7 @@ function ChampionshipsModal({ org, onClose }) {
       setLoading(true);
       setError('');
       try {
-        const res = await fetch(`http://localhost:3001/api/organizacoes/${org.id}/championships`);
+        const res = await fetch(`${API_BASE_URL}/api/organizacoes/${org.id}/championships`);
         const data = await res.json();
         if (res.ok) {
           setChamps(data); // A rota já retorna ordenado por data
@@ -2066,7 +2081,7 @@ function CreateChampionshipForm() {
       try {
         if (userData.admin === true && userData.tipo !== 'organizador') {
           setIsGlobalAdmin(true);
-          const res = await fetch('http://localhost:3001/api/organizacoes');
+          const res = await fetch(`${API_BASE_URL}/api/organizacoes`);
           const data = await res.json();
           if (res.ok) {
             setOrgsList(data);
@@ -2077,7 +2092,7 @@ function CreateChampionshipForm() {
           }
         } 
         else if (userData.tipo === 'organizador' && userData.organizacaoId) {
-          const res = await fetch(`http://localhost:3001/api/organizacoes/${userData.organizacaoId}`);
+          const res = await fetch(`${API_BASE_URL}/api/organizacoes/${userData.organizacaoId}`);
           const data = await res.json();
           if (res.ok) {
             setXpBaseAutomatico(data.xpBase || 1000); 
@@ -2122,7 +2137,7 @@ function CreateChampionshipForm() {
         organizadorId: isGlobalAdmin ? selectedOrgId : null 
       };
       
-      const res = await fetch('http://localhost:3001/api/championships', {
+      const res = await fetch(`${API_BASE_URL}/api/championships`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
         body: JSON.stringify(body)
@@ -2224,7 +2239,7 @@ function ManageOrganizationsForm() {
       try {
         // Se for Admin Global, busca TODAS
         if (userData.admin === true && userData.tipo !== 'organizador') {
-          const res = await fetch('http://localhost:3001/api/organizacoes');
+          const res = await fetch(`${API_BASE_URL}/api/organizacoes`);
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Erro ao buscar orgs');
           setOrgsList(data);
@@ -2232,7 +2247,7 @@ function ManageOrganizationsForm() {
         }
         // Se for Organizador, só pode editar a sua
         else if (userData.tipo === 'organizador' && userData.organizacaoId) {
-          const res = await fetch(`http://localhost:3001/api/organizacoes/${userData.organizacaoId}`);
+          const res = await fetch(`${API_BASE_URL}/api/organizacoes/${userData.organizacaoId}`);
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Erro ao buscar sua org');
           setOrgsList([data]); // A lista é só ele mesmo
@@ -2259,7 +2274,7 @@ function ManageOrganizationsForm() {
       // Se não, busca os dados completos (fallback)
       const fetchOrgData = async () => {
         try {
-          const res = await fetch(`http://localhost:3001/api/organizacoes/${selectedOrgId}`);
+          const res = await fetch(`${API_BASE_URL}/api/organizacoes/${selectedOrgId}`);
           const data = await res.json();
           if (res.ok) setFormData(data);
         } catch (err) {
@@ -2287,7 +2302,7 @@ function ManageOrganizationsForm() {
 
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`http://localhost:3001/api/organizacoes/${selectedOrgId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/organizacoes/${selectedOrgId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
         body: JSON.stringify(formData) // Envia o estado do formulário
@@ -2368,7 +2383,7 @@ function ManageRankingConfigCard() {
     setLoading(true);
     const fetchConfig = async () => {
       try {
-        const res = await fetch('http://localhost:3001/api/config/ranking');
+        const res = await fetch(`${API_BASE_URL}/api/config/ranking`);
         const data = await res.json();
         if (res.ok) {
           setMinXpJogadores(data.minXpJogadores);
@@ -2391,7 +2406,7 @@ function ManageRankingConfigCard() {
     
     try {
       const token = await user.getIdToken();
-      const res = await fetch('http://localhost:3001/api/config/ranking', {
+      const res = await fetch(`${API_BASE_URL}/api/config/ranking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
         body: JSON.stringify({ 
@@ -2464,7 +2479,7 @@ function ResetRankingCard() {
     setLoading(true);
     try {
       const token = await user.getIdToken();
-      const res = await fetch('http://localhost:3001/api/admin/ranking/reset', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/ranking/reset`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -2528,7 +2543,7 @@ function CreateDonationForm() {
       if (!user) return;
       try {
         const token = await user.getIdToken();
-        const res = await fetch('http://localhost:3001/api/fans', {
+        const res = await fetch(`${API_BASE_URL}/api/fans`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
@@ -2571,7 +2586,7 @@ function CreateDonationForm() {
 
     try {
       const token = await user.getIdToken();
-      const res = await fetch('http://localhost:3001/api/donations', {
+      const res = await fetch(`${API_BASE_URL}/api/donations`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
         body: JSON.stringify(body)
@@ -2672,14 +2687,14 @@ function FinalizeChampionshipForm() {
       try {
         const token = await user.getIdToken();
         const headers = { 'Authorization': `Bearer ${token}` };
-        const champsRes = await fetch('http://localhost:3001/api/admin/my-championships', { headers });
+        const champsRes = await fetch(`${API_BASE_URL}/api/admin/my-championships`, { headers });
         const champsData = await champsRes.json();
         if (champsRes.ok) {
           const abertos = champsData.filter(c => c.status !== 'finalizado');
           setChampionships(abertos);
           if (abertos.length > 0) setSelectedChamp(abertos[0].id);
         } else { throw new Error(champsData.error || 'Erro ao buscar seus campeonatos'); }
-        const playersRes = await fetch('http://localhost:3001/api/players', { headers });
+        const playersRes = await fetch(`${API_BASE_URL}/api/players`, { headers });
         const playersData = await playersRes.json();
         if (playersRes.ok) { setAllPlayers(playersData); } 
         else { throw new Error(playersData.error || 'Erro ao buscar jogadores'); }
@@ -2727,7 +2742,7 @@ function FinalizeChampionshipForm() {
     const participationData = participationPlayers.map(p => p.id);
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`http://localhost:3001/api/admin/championships/${selectedChamp}/finalize`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/championships/${selectedChamp}/finalize`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
         body: JSON.stringify({ top8: top8Data, participation: participationData })
@@ -2828,14 +2843,14 @@ function FinalizeChampionshipFormCustom() {
       try {
         const token = await user.getIdToken();
         const headers = { 'Authorization': `Bearer ${token}` };
-        const champsRes = await fetch('http://localhost:3001/api/admin/my-championships', { headers });
+        const champsRes = await fetch(`${API_BASE_URL}/api/admin/my-championships`, { headers });
         const champsData = await champsRes.json();
         if (champsRes.ok) {
           const abertos = champsData.filter(c => c.status !== 'finalizado');
           setChampionships(abertos);
           if (abertos.length > 0) setSelectedChamp(abertos[0].id);
         } else { throw new Error(champsData.error || 'Erro ao buscar seus campeonatos'); }
-        const playersRes = await fetch('http://localhost:3001/api/players', { headers });
+        const playersRes = await fetch(`${API_BASE_URL}/api/players`, { headers });
         const playersData = await playersRes.json();
         if (playersRes.ok) { setAllPlayers(playersData); } 
         else { throw new Error(playersData.error || 'Erro ao buscar jogadores'); }
@@ -2891,7 +2906,7 @@ function FinalizeChampionshipFormCustom() {
     const participationDataFormatted = { jogadorIds: participationPlayers.map(p => p.id), xpGanho: Number(participationXp) };
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`http://localhost:3001/api/admin/championships/${selectedChamp}/finalize-custom`, { 
+      const res = await fetch(`${API_BASE_URL}/api/admin/championships/${selectedChamp}/finalize-custom`, { 
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
         body: JSON.stringify({ top8: top8DataFormatted, participation: participationDataFormatted })
